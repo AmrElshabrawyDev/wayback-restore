@@ -3,7 +3,7 @@
 export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const USER_AGENT =
-  "wp-wayback-restore (+https://github.com/AmrElshabrawyDev/wp-wayback-restore)";
+  "wayback-restore (+https://github.com/AmrElshabrawyDev/wayback-restore)";
 
 const RETRYABLE = new Set([408, 425, 429, 500, 502, 503, 504, 520, 522, 524]);
 

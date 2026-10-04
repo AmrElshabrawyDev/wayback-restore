@@ -3,7 +3,8 @@
  * which archived URLs are real content (posts/pages) worth restoring.
  */
 
-const WAYBACK = "https://web.archive.org";
+/** Override for tests or a self-hosted mirror: WAYBACK_ENDPOINT=http://localhost:8080 */
+export const WAYBACK = (process.env.WAYBACK_ENDPOINT || "https://web.archive.org").replace(/\/$/, "");
 
 /** Strip protocol, "www." and trailing slashes: "https://www.Example.com/" → "example.com" */
 export function normalizeDomain(input) {
@@ -37,7 +38,7 @@ const WAYBACK_PREFIX = /^(?:https?:)?\/\/web\.archive\.org\/web\/\d{1,14}(?:[a-z
 export function unwrapWaybackUrl(url) {
   if (!url) return url;
   let out = url.trim();
-  if (out.startsWith("/web/")) out = WAYBACK + out;
+  if (out.startsWith("/web/")) out = `https://web.archive.org${out}`;
   out = out.replace(WAYBACK_PREFIX, "");
   // "https:/site.com" can appear after unwrapping
   return out.replace(/^(https?):\/(?!\/)/i, "$1://");

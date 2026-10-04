@@ -1,20 +1,22 @@
 /**
- * wp-wayback-restore — recover a WordPress site's posts from the Wayback Machine.
+ * wayback-restore — recover a website's posts from the Wayback Machine.
  *
- *   import { restore } from "wp-wayback-restore";
- *   const { posts, report } = await restore({ domain: "example.com", outDir: "restored" });
+ *   import { restore } from "@amrelshabrawydev/wayback-restore";
+ *   const { posts, report } = await restore({ domain: "example.com", formats: ["json", "supabase"] });
  */
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { listSnapshots } from "./cdx.js";
+import { exportPosts } from "./exporters.js";
 import { extractPost } from "./extract.js";
 import { fetchWithRetry, sleep } from "./http.js";
 import { restoreImages } from "./images.js";
-import { writeMarkdown, writePostsJson, writeReport } from "./output.js";
+import { writeReport } from "./output.js";
 import { isContentUrl, normalizeDomain, snapshotUrl } from "./urls.js";
 
 export { listSnapshots } from "./cdx.js";
+export { EXPORTERS, EXPORTER_IDS, exportPosts, toCsv, toMongoNdjson, toRecord, toSql, toWxr } from "./exporters.js";
 export { extractPost, originalImageUrl } from "./extract.js";
 export { restoreImages, downloadImage } from "./images.js";
 export { toMarkdown } from "./output.js";
@@ -24,6 +26,7 @@ const DEFAULTS = {
   outDir: "restored",
   types: ["post", "page", "unknown"],
   formats: ["json"],
+  table: "posts",
   images: true,
   imageBase: "",
   imageSources: ["archive", "live"],
@@ -66,6 +69,9 @@ export async function restore(options) {
   if (!domain || !domain.includes(".")) throw new Error(`Invalid domain: "${opts.domain}"`);
   const { fetchImpl } = opts;
   const log = opts.log ?? (() => {});
+  const onProgress = opts.onProgress ?? (() => {});
+  // the Prisma import script reads posts.json
+  const formats = opts.formats.includes("prisma") && !opts.formats.includes("json") ? ["json", ...opts.formats] : opts.formats;
 
   const outDir = path.resolve(opts.outDir);
   const cacheDir = path.join(outDir, ".cache");
@@ -110,6 +116,7 @@ export async function restore(options) {
       if (skip) {
         report.skipped.push({ url: snapshot.original, reason: skip });
         log(`${progress} skip (${skip}) ${post.path}`);
+        onProgress({ index, total: candidates.length, status: "skipped", path: post.path });
         continue;
       }
 
@@ -131,17 +138,18 @@ export async function restore(options) {
 
       posts.push(post);
       report.restored++;
-      if (opts.formats.includes("md")) await writeMarkdown(post, outDir);
       log(`${progress} ${cached ? "cached " : ""}✓ ${post.title || post.path}`);
+      onProgress({ index, total: candidates.length, status: "restored", path: post.path, title: post.title });
     } catch (error) {
       report.failed.push({ url: snapshot.original, error: error.message });
       log(`${progress} ✗ ${snapshot.original} (${error.message})`);
+      onProgress({ index, total: candidates.length, status: "failed", path: snapshot.original });
     }
   }
 
   // newest first, like a blog
   posts.sort((a, b) => (b.publishedAt || b.archivedAt).localeCompare(a.publishedAt || a.archivedAt));
-  if (opts.formats.includes("json")) await writePostsJson(posts, outDir);
+  report.files = await exportPosts(posts, { formats, outDir, table: opts.table, domain });
   report.images.missing = [...new Set(report.images.missing)];
   report.finishedAt = new Date().toISOString();
   await writeReport(report, outDir);

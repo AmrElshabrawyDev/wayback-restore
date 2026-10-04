@@ -23,12 +23,6 @@ function yaml(data) {
 export const markdownFileName = (slug) =>
   `${slug.replace(/[\\:*?"<>|]/g, "-").replace(/\//g, "__").slice(0, 180) || "index"}.md`;
 
-export async function writePostsJson(posts, outDir) {
-  const file = path.join(outDir, "posts.json");
-  await fs.writeFile(file, JSON.stringify(posts, null, 2));
-  return file;
-}
-
 export async function writeMarkdown(post, outDir) {
   const dir = path.join(outDir, "posts");
   await fs.mkdir(dir, { recursive: true });

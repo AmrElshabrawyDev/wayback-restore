@@ -2,21 +2,27 @@
 import { parseArgs } from "node:util";
 import { readFile } from "node:fs/promises";
 import { restore } from "../src/index.js";
+import { EXPORTERS, EXPORTER_IDS } from "../src/exporters.js";
+import { banner } from "../src/cli/banner.js";
+
+const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 
 const HELP = `
-wp-wayback-restore — recover a lost WordPress site's posts from the Wayback Machine
-
 Usage
-  npx wp-wayback-restore <domain> [options]
+  npx @amrelshabrawydev/wayback-restore              interactive mode (asks a few questions)
+  npx @amrelshabrawydev/wayback-restore <domain> [options]
 
 Examples
-  npx wp-wayback-restore example.com
-  npx wp-wayback-restore example.com --format json,md --from 2022 --to 2024
-  npx wp-wayback-restore example.com --include "^/blog/" --dry-run
+  wayback-restore example.com --dry-run
+  wayback-restore example.com --format json,md --limit 5
+  wayback-restore example.com --format supabase,postgres --table articles
+  wayback-restore example.com --to 2024-06 --include "^/blog/"
 
 Options
   -o, --out <dir>          Output folder (default: restored)
-  -f, --format <list>      json, md or json,md (default: json)
+  -f, --format <list>      Comma-separated, default json:
+${EXPORTERS.map((e) => `                             ${e.id.padEnd(10)} ${e.hint}`).join("\n")}
+      --table <name>       Table/collection name for database exports (default: posts)
       --from <date>        Only snapshots from this date (2023, 2023-05, 20230501)
       --to <date>          Only snapshots up to this date
       --include <regex>    Only restore paths matching this pattern
@@ -30,12 +36,18 @@ Options
       --keep-missing-images  Keep <img> tags whose image couldn't be downloaded
       --delay <ms>         Pause between archive requests (default: 1500)
       --dry-run            Only list the pages that would be restored
+  -i, --interactive        Ask questions instead of reading options
   -q, --quiet              Less output
   -v, --version            Show version
   -h, --help               Show this help
 `;
 
 const list = (value) => value.split(",").map((s) => s.trim()).filter(Boolean);
+
+function fail(message) {
+  console.error(`Error: ${message}\nRun with --help for usage.`);
+  process.exit(1);
+}
 
 function regex(value, name) {
   try {
@@ -45,45 +57,55 @@ function regex(value, name) {
   }
 }
 
-function fail(message) {
-  console.error(`Error: ${message}\nRun with --help for usage.`);
-  process.exit(1);
+let parsed;
+try {
+  parsed = parseArgs({
+    allowPositionals: true,
+    options: {
+      out: { type: "string", short: "o" },
+      format: { type: "string", short: "f" },
+      table: { type: "string" },
+      from: { type: "string" },
+      to: { type: "string" },
+      include: { type: "string" },
+      exclude: { type: "string" },
+      types: { type: "string" },
+      "min-words": { type: "string" },
+      limit: { type: "string" },
+      "no-images": { type: "boolean" },
+      "image-base": { type: "string" },
+      "image-source": { type: "string" },
+      "keep-missing-images": { type: "boolean" },
+      delay: { type: "string" },
+      "dry-run": { type: "boolean" },
+      interactive: { type: "boolean", short: "i" },
+      quiet: { type: "boolean", short: "q" },
+      version: { type: "boolean", short: "v" },
+      help: { type: "boolean", short: "h" },
+    },
+  });
+} catch (error) {
+  fail(error.message);
 }
-
-const { values, positionals } = parseArgs({
-  allowPositionals: true,
-  options: {
-    out: { type: "string", short: "o" },
-    format: { type: "string", short: "f" },
-    from: { type: "string" },
-    to: { type: "string" },
-    include: { type: "string" },
-    exclude: { type: "string" },
-    types: { type: "string" },
-    "min-words": { type: "string" },
-    limit: { type: "string" },
-    "no-images": { type: "boolean" },
-    "image-base": { type: "string" },
-    "image-source": { type: "string" },
-    "keep-missing-images": { type: "boolean" },
-    delay: { type: "string" },
-    "dry-run": { type: "boolean" },
-    quiet: { type: "boolean", short: "q" },
-    version: { type: "boolean", short: "v" },
-    help: { type: "boolean", short: "h" },
-  },
-});
+const { values, positionals } = parsed;
 
 if (values.help) {
-  console.log(HELP);
+  console.log(banner({ version: pkg.version }) + HELP);
   process.exit(0);
 }
 if (values.version) {
-  const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   console.log(pkg.version);
   process.exit(0);
 }
-if (positionals.length !== 1) fail("pass exactly one domain, e.g. example.com");
+
+// No domain given in a terminal → interactive mode
+if (values.interactive || (positionals.length === 0 && process.stdin.isTTY && process.stdout.isTTY)) {
+  const { runWizard } = await import("../src/cli/wizard.js");
+  await runWizard({ version: pkg.version });
+  process.exit(process.exitCode ?? 0);
+}
+
+if (positionals.length !== 1) fail("pass exactly one domain, e.g. example.com (or run without arguments for interactive mode)");
 
 const number = (value, name) => {
   if (value === undefined) return undefined;
@@ -93,12 +115,14 @@ const number = (value, name) => {
 };
 
 const formats = values.format ? list(values.format) : undefined;
-if (formats?.some((f) => !["json", "md"].includes(f))) fail("--format accepts json, md or json,md");
+const unknown = formats?.filter((f) => !EXPORTER_IDS.includes(f));
+if (unknown?.length) fail(`unknown --format ${unknown.join(", ")}. Available: ${EXPORTER_IDS.join(", ")}`);
 
 const options = {
   domain: positionals[0],
   outDir: values.out,
   formats,
+  table: values.table,
   from: values.from,
   to: values.to,
   include: values.include && regex(values.include, "include"),
@@ -125,6 +149,7 @@ try {
     console.log(
       `\nDone: ${report.restored} restored, ${report.skipped.length} skipped, ${report.failed.length} failed, ` +
         `${report.images.downloaded} images downloaded, ${report.images.missing.length} missing.` +
+        `\nFiles: ${report.files.join(", ")}` +
         `\nSee ${options.outDir ?? "restored"}/report.json for details.`,
     );
   }

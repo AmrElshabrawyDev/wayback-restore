@@ -1,0 +1,218 @@
+/**
+ * Interactive mode: `npx @amrelshabrawydev/wayback-restore` with no arguments
+ * asks a few questions (like create-next-app) instead of needing long commands.
+ */
+import * as p from "@clack/prompts";
+import pc from "picocolors";
+import { EXPORTERS } from "../exporters.js";
+import { restore } from "../index.js";
+import { normalizeDomain } from "../urls.js";
+import { banner } from "./banner.js";
+
+/** Stop cleanly when the user presses Ctrl+C / Esc */
+const answer = (value) => {
+  if (p.isCancel(value)) {
+    p.cancel("Cancelled — nothing was downloaded.");
+    process.exit(0);
+  }
+  return value;
+};
+
+export const validateDomain = (value) => {
+  const domain = normalizeDomain(value || "");
+  if (!domain) return "Enter the website's domain, e.g. example.com";
+  // letters in any script (Arabic domains too), digits, dots and hyphens, with a TLD
+  if (!/^[\p{L}\p{N}-]+(\.[\p{L}\p{N}-]+)*\.\p{L}{2,}$/u.test(domain)) return `"${value}" doesn't look like a domain`;
+  return undefined;
+};
+
+export const validateDate = (value) =>
+  /^\d{4}(-?\d{2}(-?\d{2})?)?$/.test((value || "").trim()) ? undefined : "Use YYYY, YYYY-MM or YYYY-MM-DD";
+
+export const validateTable = (value) =>
+  /^[A-Za-z_][A-Za-z0-9_]*$/.test((value || "").trim()) ? undefined : "Letters, numbers and _ only (e.g. posts)";
+
+/** Equivalent one-line command, so the same restore can be repeated without questions */
+export function toCommand(o) {
+  const args = [o.domain];
+  if (o.outDir !== "restored") args.push("--out", o.outDir);
+  if (o.formats.join(",") !== "json") args.push("--format", o.formats.join(","));
+  if (o.table && o.table !== "posts") args.push("--table", o.table);
+  if (o.to) args.push("--to", o.to);
+  if (o.include) args.push("--include", `"${o.include.source}"`);
+  if (!o.images) args.push("--no-images");
+  if (o.limit && Number.isFinite(o.limit)) args.push("--limit", String(o.limit));
+  return `npx @amrelshabrawydev/wayback-restore ${args.join(" ")}`;
+}
+
+const NEXT_STEPS = {
+  json: (dir) => `${pc.bold("JSON")}: ${dir}/posts.json`,
+  md: (dir) => `${pc.bold("Markdown")}: copy ${dir}/posts/ into your content folder (Next.js, Astro, Hugo…)`,
+  supabase: (dir, table) =>
+    `${pc.bold("Supabase")}: run ${dir}/supabase/migration.sql in the SQL editor, then\n  SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node ${dir}/supabase/import-${table}.mjs`,
+  prisma: (dir, table) => `${pc.bold("Prisma")}: add ${dir}/prisma/model.prisma to your schema, migrate, then node ${dir}/prisma/import-${table}.mjs`,
+  postgres: (dir) => `${pc.bold("PostgreSQL")}: psql "$DATABASE_URL" -f ${dir}/sql/posts.postgres.sql`,
+  mysql: (dir) => `${pc.bold("MySQL")}: mysql -u user -p dbname < ${dir}/sql/posts.mysql.sql`,
+  sqlite: (dir) => `${pc.bold("SQLite")}: sqlite3 site.db < ${dir}/sql/posts.sqlite.sql`,
+  mongodb: (dir) => `${pc.bold("MongoDB")}: mongoimport --uri "$MONGODB_URI" --collection posts --file ${dir}/mongodb/posts.ndjson`,
+  csv: (dir) => `${pc.bold("CSV")}: open ${dir}/posts.csv in Excel or Google Sheets`,
+  wordpress: (dir) => `${pc.bold("WordPress")}: Tools → Import → WordPress → ${dir}/wordpress/wordpress-export.xml`,
+};
+
+export async function runWizard({ version }) {
+  console.log(banner({ version }));
+  p.intro(pc.inverse(" Let's bring your site back "));
+
+  const domain = normalizeDomain(
+    answer(
+      await p.text({
+        message: "Which website do you want to restore?",
+        placeholder: "example.com",
+        validate: validateDomain,
+      }),
+    ),
+  );
+
+  answer(
+    await p.select({
+      message: "What was the site built with?",
+      options: [
+        { value: "wordpress", label: "WordPress", hint: "best results" },
+        { value: "generic", label: "Something else / not sure", hint: "generic extraction (beta)" },
+        { value: "blogger", label: "Blogger", hint: "coming soon", disabled: true },
+        { value: "ghost", label: "Ghost", hint: "coming soon", disabled: true },
+        { value: "shopify", label: "Shopify / Salla / Zid (products)", hint: "coming soon", disabled: true },
+      ],
+    }),
+  );
+
+  const formats = answer(
+    await p.multiselect({
+      message: `Where will you import the content? ${pc.dim("(space to select, enter to confirm)")}`,
+      options: EXPORTERS.map((e) => ({ value: e.id, label: e.label, hint: e.hint })),
+      initialValues: ["json"],
+      required: true,
+    }),
+  );
+
+  let table = "posts";
+  if (formats.some((f) => ["supabase", "prisma", "postgres", "mysql", "sqlite"].includes(f))) {
+    table = answer(
+      await p.text({ message: "Database table name?", placeholder: "posts", defaultValue: "posts", validate: (v) => (v ? validateTable(v) : undefined) }),
+    ).trim() || "posts";
+  }
+
+  const when = answer(
+    await p.select({
+      message: "Which version of the site?",
+      options: [
+        { value: "latest", label: "The latest archived copy", hint: "recommended" },
+        { value: "before", label: "A copy from before a certain date", hint: "e.g. before the site was hacked or redesigned" },
+      ],
+    }),
+  );
+  const to =
+    when === "before"
+      ? answer(await p.text({ message: "Use copies from before which date?", placeholder: "2024-06-01", validate: validateDate })).trim()
+      : undefined;
+
+  const scope = answer(
+    await p.select({
+      message: "Which pages?",
+      options: [
+        { value: "all", label: "All posts and pages" },
+        { value: "prefix", label: "Only a section of the site", hint: "e.g. /blog/" },
+      ],
+    }),
+  );
+  let include;
+  if (scope === "prefix") {
+    const prefix = answer(await p.text({ message: "Path that the pages start with", placeholder: "/blog/", validate: (v) => (v?.startsWith("/") ? undefined : "Start with /") }));
+    include = new RegExp(`^${prefix.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i");
+  }
+
+  const images = answer(await p.confirm({ message: "Download the images too?", initialValue: true }));
+
+  const outDir = answer(
+    await p.text({ message: "Save everything in which folder?", placeholder: "restored", defaultValue: "restored" }),
+  ).trim() || "restored";
+
+  const mode = answer(
+    await p.select({
+      message: "Ready?",
+      options: [
+        { value: "test", label: "Quick test — restore the first 5 pages", hint: "recommended first run" },
+        { value: "full", label: "Restore everything" },
+        { value: "preview", label: "Only list what would be restored", hint: "no downloads" },
+      ],
+    }),
+  );
+
+  const options = {
+    domain,
+    formats,
+    table,
+    to,
+    include,
+    images,
+    outDir,
+    limit: mode === "test" ? 5 : Infinity,
+    dryRun: mode === "preview",
+  };
+
+  // --- run ---
+  const spin = p.spinner();
+  let spinning = true;
+  spin.start(`Asking the Internet Archive about ${domain}…`);
+  let bar;
+  let restored = 0;
+  try {
+    const result = await restore({
+      ...options,
+      log: (line) => {
+        const found = line.match(/^Found (\d+) archived pages, (\d+) look like/);
+        if (found) {
+          spinning = false;
+          spin.stop(`Found ${found[1]} archived pages, ${pc.bold(found[2])} look like posts/pages`);
+          if (!options.dryRun && Number(found[2]) > 0) {
+            bar = p.progress({ max: Math.min(Number(found[2]), options.limit) });
+            bar.start("Restoring pages");
+          }
+        }
+      },
+      onProgress: ({ status, title, path }) => {
+        if (status === "restored") restored++;
+        bar?.advance(1, `${status === "restored" ? pc.green("✓") : status === "skipped" ? pc.dim("–") : pc.red("✗")} ${title || decodeURI(path)}`);
+      },
+    });
+    bar?.stop(`Restored ${restored} pages`);
+
+    const { report } = result;
+    if (options.dryRun) {
+      const list = (result.candidates || []).slice(0, 15).map((s) => `  ${decodeURI(new URL(s.original).pathname)}`);
+      p.note(`${list.join("\n")}${report.candidates > 15 ? `\n  …and ${report.candidates - 15} more` : ""}`, `${report.candidates} pages would be restored`);
+    } else {
+      p.note(
+        [
+          `${pc.green("✓")} ${report.restored} restored   ${pc.dim(`${report.skipped.length} skipped`)}   ${report.failed.length ? pc.red(`${report.failed.length} failed`) : "0 failed"}`,
+          options.images ? `${pc.green("✓")} ${report.images.downloaded} images downloaded   ${pc.dim(`${report.images.missing.length} missing`)}` : null,
+          "",
+          ...formats.map((f) => NEXT_STEPS[f]?.(outDir, table)).filter(Boolean),
+          "",
+          pc.dim(`Details: ${outDir}/report.json`),
+        ]
+          .filter((line) => line !== null)
+          .join("\n"),
+        "Done",
+      );
+    }
+    p.log.message(`${pc.dim("Run the same restore again without questions:")}\n${pc.cyan(toCommand({ ...options, limit: mode === "test" ? Infinity : options.limit }))}`);
+    p.outro(mode === "test" ? "Looks good? Run it again and choose “Restore everything”." : "Happy restoring! ⭐ Star the repo if it helped: github.com/AmrElshabrawyDev/wayback-restore");
+  } catch (error) {
+    if (spinning) spin.error("Something went wrong");
+    else bar?.error("Something went wrong");
+    p.log.error(error.message);
+    p.outro(pc.red("Restore failed"));
+    process.exitCode = 1;
+  }
+}

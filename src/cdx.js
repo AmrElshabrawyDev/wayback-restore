@@ -4,9 +4,9 @@
  * Docs: https://github.com/internetarchive/wayback/tree/master/wayback-cdx-server
  */
 import { fetchWithRetry, sleep } from "./http.js";
-import { pageKey } from "./urls.js";
+import { pageKey, WAYBACK } from "./urls.js";
 
-const CDX = "https://web.archive.org/cdx/search/cdx";
+const CDX = `${WAYBACK}/cdx/search/cdx`;
 const PAGE_SIZE = 5000;
 
 /** Wayback timestamps are YYYYMMDDhhmmss; accept "2023", "2023-05" or "20230501" */
