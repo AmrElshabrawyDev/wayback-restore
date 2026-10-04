@@ -1,0 +1,48 @@
+{
+  "name": "wp-wayback-restore",
+  "version": "0.1.0",
+  "description": "Recover a lost WordPress site's posts and images from the Internet Archive (Wayback Machine) — with the original URLs, titles, meta descriptions and Arabic/RTL slugs intact.",
+  "type": "module",
+  "bin": {
+    "wp-wayback-restore": "bin/cli.js"
+  },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "bin",
+    "src"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20.18.1"
+  },
+  "keywords": [
+    "wordpress",
+    "wayback-machine",
+    "internet-archive",
+    "migration",
+    "recovery",
+    "backup",
+    "seo",
+    "nextjs",
+    "arabic",
+    "rtl"
+  ],
+  "author": "Amr Elshabrawy (https://amrelshabrawydev.github.io)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AmrElshabrawyDev/wp-wayback-restore.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AmrElshabrawyDev/wp-wayback-restore/issues"
+  },
+  "homepage": "https://github.com/AmrElshabrawyDev/wp-wayback-restore#readme",
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "turndown": "^7.2.4"
+  }
+}
