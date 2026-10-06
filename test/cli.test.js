@@ -3,8 +3,7 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
-import { banner, pixelLogo } from "../src/cli/banner.js";
-import { LOGO_PIXELS } from "../src/cli/logo-pixels.js";
+import { banner, canAnimate, logoLines, playBanner } from "../src/cli/banner.js";
 import { fitLine, humanDate, platformOptions, toCommand, validateDate, validateDomain, validateTable } from "../src/cli/wizard.js";
 
 const run = promisify(execFile);
@@ -79,17 +78,39 @@ test("fitLine keeps progress messages on one line", () => {
   assert.equal([...fitLine("x".repeat(200), 40)].length, 40);
 });
 
-test("banner draws the real logo in colour terminals, half a pixel row per line", () => {
+test("banner draws the hexagon logo in colour terminals", () => {
   const truecolor = banner({ version: "1.0.0", stream: { hasColors: () => true, columns: 120 } });
   assert.match(truecolor, /\x1b\[38;2;\d+;\d+;\d+m\x1b\[48;2;/);
   assert.match(truecolor, /wayback-restore/);
-  assert.equal(pixelLogo().length, Math.ceil(LOGO_PIXELS.length / 2));
+  assert.equal(logoLines().length, 10);
 
   // 256-colour terminals get the same logo with the nearest palette colours
   const palette = banner({ version: "1.0.0", stream: { hasColors: (n = 16) => n <= 256, columns: 120 } });
   assert.match(palette, /\x1b\[38;5;\d+m/);
   assert.doesNotMatch(palette, /38;2;/);
+});
 
-  // every row has the same width
-  assert.equal(new Set(LOGO_PIXELS.map((row) => row.length)).size, 1);
+test("logo animation: empty at the start, the full logo at the end", () => {
+  const visible = (lines) => lines.join("").replace(/\x1b\[[0-9;]*m/g, "").replace(/ /g, "").length;
+  assert.equal(visible(logoLines(0)), 0);
+  assert.ok(visible(logoLines(0.3)) > 0 && visible(logoLines(0.3)) < visible(logoLines(1)));
+  assert.deepEqual(logoLines(1), logoLines(), "the last frame is the static logo (no shimmer left over)");
+});
+
+test("playBanner prints the static banner when it can't animate", async () => {
+  let out = "";
+  const stream = { isTTY: false, hasColors: () => false, columns: 100, write: (s) => (out += s) };
+  await playBanner({ version: "1.0.0", stream, input: null });
+  assert.equal(out, banner({ version: "1.0.0", stream }));
+  assert.ok(!canAnimate({ isTTY: true, hasColors: () => true }, { CI: "true" }), "never animates in CI");
+});
+
+test("playBanner animates in a terminal and ends on the full banner", async () => {
+  let out = "";
+  const stream = { isTTY: true, hasColors: () => true, columns: 100, write: (s) => (out += s) };
+  await playBanner({ version: "1.0.0", stream, input: null, duration: 10, frames: 5 });
+  assert.match(out, /^\x1b\[\?25l/, "hides the cursor");
+  assert.match(out, /\x1b\[\?25h$/, "and shows it again");
+  assert.equal((out.match(/\x1b\[11A/g) || []).length, 5, "redraws in place");
+  assert.ok(out.includes(banner({ version: "1.0.0", stream }).split("\n")[3]));
 });

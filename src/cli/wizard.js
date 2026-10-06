@@ -15,7 +15,7 @@ export const humanDate = (date) => {
   const [, y, m, d] = String(date || "").match(/^(\d{4})-(\d{2})-(\d{2})/) || [];
   return y ? `${Number(d)} ${MONTHS[m - 1]} ${y}` : "";
 };
-import { banner } from "./banner.js";
+import { playBanner } from "./banner.js";
 
 /** Stop cleanly when the user presses Ctrl+C / Esc */
 const answer = (value) => {
@@ -96,7 +96,8 @@ const NEXT_STEPS = {
 };
 
 export async function runWizard({ version }) {
-  console.log(banner({ version }));
+  await playBanner({ version });
+  console.log();
   p.intro(pc.inverse(" Let's bring your site back "));
 
   const domain = normalizeDomain(

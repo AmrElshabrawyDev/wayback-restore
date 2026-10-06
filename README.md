@@ -17,7 +17,7 @@ Bring a lost website back from the Internet Archive — **WordPress, Next.js, Re
 npx @amrelshabrawydev/wayback-restore
 ```
 
-<img src="docs/wizard.png" alt="wayback-restore interactive mode" width="760" />
+<img src="docs/banner.gif" alt="wayback-restore — animated logo in the terminal" width="760" />
 
 </div>
 
@@ -147,6 +147,8 @@ npx @amrelshabrawydev/wayback-restore
 
 It asks for the domain, what the site was built with, where you'll import the content, which version of the site to use, which pages, and whether to download images — then offers a **quick 5-page test** before the full run, and prints the one-line command to repeat it.
 
+<div align="center"><img src="docs/wizard.png" alt="wayback-restore interactive mode" width="760" /></div>
+
 **One command** (scripts, CI):
 
 ```bash
@@ -275,7 +277,7 @@ flowchart LR
 | `src/exporters.js` | All export formats — one object per platform |
 | `src/index.js` | `restore()` — runs the pipeline, caching and the report |
 | `src/platforms.js` | Supported platforms list and automatic detection |
-| `src/cli/` | Interactive wizard and banner (the logo is drawn from `assets/logo.svg` — regenerate with `scripts/logo-to-terminal.mjs`) |
+| `src/cli/` | Interactive wizard and the animated logo banner (pixel art in `banner.js`) |
 
 ## 📝 Good to know
 
