@@ -67,7 +67,7 @@ export async function downloadImage(imageUrl, file, { timestamp, sources = ["arc
  * Download all of a post's same-site images and point the HTML at them.
  * @param {object} post from extractPost()
  * @param {object} options { imagesDir, domain, imageBase, keepMissing, sources, delay, fetchImpl, log }
- * @returns {Promise<{ post: object, downloaded: number, missing: string[], found: object[] }>}
+ * @returns {Promise<{ post: object, downloaded: number, alreadySaved: string[], missing: string[], found: object[] }>}
  */
 export async function restoreImages(post, { imagesDir, domain, imageBase = "", keepMissing = false, ...download }) {
   const $ = cheerio.load(post.html, null, false);
@@ -75,6 +75,7 @@ export async function restoreImages(post, { imagesDir, domain, imageBase = "", k
   const localUrl = new Map();
   const missing = [];
   const found = [];
+  const alreadySaved = [];
   let downloaded = 0;
 
   for (const imageUrl of urls) {
@@ -82,7 +83,8 @@ export async function restoreImages(post, { imagesDir, domain, imageBase = "", k
     if (!file) continue;
     const result = await downloadImage(imageUrl, file, { timestamp: post.archivedAt, ...download });
     if (result) {
-      if (result.source !== "exists") {
+      if (result.source === "exists") alreadySaved.push(imageUrl);
+      else {
         downloaded++;
         found.push({ url: imageUrl, from: result.source, ...(result.archivedAt && { archivedAt: result.archivedAt }) });
       }
@@ -113,6 +115,7 @@ export async function restoreImages(post, { imagesDir, domain, imageBase = "", k
       images: post.images.map((url) => localUrl.get(url) ?? url).filter((url) => keepMissing || !missing.includes(url)),
     },
     downloaded,
+    alreadySaved,
     missing,
     found,
   };

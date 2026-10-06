@@ -102,7 +102,9 @@ test("re-runs use the cache instead of hitting the archive again", async (t) => 
 
   await restore({ domain: "example.com", outDir, delay: 0, fetchImpl: fakeArchive().fetchImpl });
   const second = fakeArchive();
-  const { posts } = await restore({ domain: "example.com", outDir, delay: 0, fetchImpl: second.fetchImpl });
+  const { posts, report } = await restore({ domain: "example.com", outDir, delay: 0, fetchImpl: second.fetchImpl });
+  assert.equal(report.images.downloaded, 0);
+  assert.equal(report.images.alreadySaved, 2, "images from the first run are counted, not downloaded again");
 
   assert.equal(posts.length, 1);
   const pageFetches = second.calls.filter((url) => url.includes("id_/"));

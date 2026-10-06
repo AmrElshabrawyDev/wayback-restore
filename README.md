@@ -275,7 +275,7 @@ flowchart LR
 | `src/exporters.js` | All export formats — one object per platform |
 | `src/index.js` | `restore()` — runs the pipeline, caching and the report |
 | `src/platforms.js` | Supported platforms list and automatic detection |
-| `src/cli/` | Interactive wizard and banner |
+| `src/cli/` | Interactive wizard and banner (the logo is drawn from `assets/logo.svg` — regenerate with `scripts/logo-to-terminal.mjs`) |
 
 ## 📝 Good to know
 

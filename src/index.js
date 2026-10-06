@@ -125,11 +125,14 @@ export async function restore(options) {
     pages: [],
     skipped: [],
     failed: [],
-    images: { downloaded: 0, missing: [], found: [] },
+    // alreadySaved: on disk from an earlier run (re-runs don't download them again)
+    images: { downloaded: 0, alreadySaved: 0, missing: [], found: [] },
     // how many pages looked like each platform (useful with platform "auto")
     platforms: {},
   };
   const posts = [];
+  const downloadedNow = new Set();
+  const savedBefore = new Set();
 
   onStart({ archivedPages: snapshots.length, candidates: candidates.length, version, limit: opts.limit });
 
@@ -179,6 +182,9 @@ export async function restore(options) {
         });
         post = result.post;
         report.images.downloaded += result.downloaded;
+        // images other pages of this run already downloaded don't count as "from an earlier run"
+        for (const url of result.alreadySaved) if (!downloadedNow.has(url)) savedBefore.add(url);
+        for (const { url } of result.found) downloadedNow.add(url);
         report.images.missing.push(...result.missing);
         report.images.found.push(...result.found);
       }
@@ -199,6 +205,7 @@ export async function restore(options) {
   posts.sort((a, b) => (b.publishedAt || b.archivedAt).localeCompare(a.publishedAt || a.archivedAt));
   report.files = await exportPosts(posts, { formats, outDir, table: opts.table, domain });
   report.images.missing = [...new Set(report.images.missing)];
+  report.images.alreadySaved = savedBefore.size;
   // the copies the restored pages actually came from
   report.version.used = snapshotRange(report.pages);
   // different site names usually mean some copies are from after the site was replaced

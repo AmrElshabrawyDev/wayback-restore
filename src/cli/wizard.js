@@ -260,7 +260,9 @@ export async function runWizard({ version }) {
       p.note(
         [
           `${pc.green("✓")} ${report.restored} restored   ${pc.dim(`${report.skipped.length} skipped`)}   ${report.failed.length ? pc.red(`${report.failed.length} failed`) : "0 failed"}`,
-          options.images ? `${pc.green("✓")} ${report.images.downloaded} images downloaded   ${pc.dim(`${report.images.missing.length} missing`)}` : null,
+          options.images
+            ? `${pc.green("✓")} ${report.images.downloaded} images downloaded${report.images.alreadySaved ? pc.dim(` (+${report.images.alreadySaved} already saved)`) : ""}   ${pc.dim(`${report.images.missing.length} missing`)}`
+            : null,
           report.version.used ? `${pc.cyan("◷")} archived copies from ${humanDate(report.version.used.from)} to ${humanDate(report.version.used.to)}` : null,
           "",
           ...formats.map((f) => NEXT_STEPS[f]?.(outDir, table)).filter(Boolean),

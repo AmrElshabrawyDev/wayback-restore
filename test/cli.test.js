@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
-import { banner } from "../src/cli/banner.js";
+import { banner, pixelLogo } from "../src/cli/banner.js";
+import { LOGO_PIXELS } from "../src/cli/logo-pixels.js";
 import { fitLine, humanDate, platformOptions, toCommand, validateDate, validateDomain, validateTable } from "../src/cli/wizard.js";
 
 const run = promisify(execFile);
@@ -76,4 +77,19 @@ test("fitLine keeps progress messages on one line", () => {
   assert.equal(fitLine("short", 10), "short");
   assert.equal(fitLine("أفكار سحرية لحماية الزجاج", 10), "أفكار سحر…");
   assert.equal([...fitLine("x".repeat(200), 40)].length, 40);
+});
+
+test("banner draws the real logo in colour terminals, half a pixel row per line", () => {
+  const truecolor = banner({ version: "1.0.0", stream: { hasColors: () => true, columns: 120 } });
+  assert.match(truecolor, /\x1b\[38;2;\d+;\d+;\d+m\x1b\[48;2;/);
+  assert.match(truecolor, /wayback-restore/);
+  assert.equal(pixelLogo().length, Math.ceil(LOGO_PIXELS.length / 2));
+
+  // 256-colour terminals get the same logo with the nearest palette colours
+  const palette = banner({ version: "1.0.0", stream: { hasColors: (n = 16) => n <= 256, columns: 120 } });
+  assert.match(palette, /\x1b\[38;5;\d+m/);
+  assert.doesNotMatch(palette, /38;2;/);
+
+  // every row has the same width
+  assert.equal(new Set(LOGO_PIXELS.map((row) => row.length)).size, 1);
 });
