@@ -1,0 +1,24 @@
+name: ✨ Feature or new platform
+description: Suggest an idea, a platform to restore from, or a place to export to
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+      description: e.g. "Restore Blogger sites", "Export to Strapi", "Generate a redirects file"
+    validations:
+      required: true
+  - type: input
+    id: example
+    attributes:
+      label: Example domain (if relevant)
+      placeholder: example.blogspot.com
+  - type: dropdown
+    id: help
+    attributes:
+      label: Would you like to help build it?
+      options:
+        - Yes, I'd like to open a pull request
+        - Maybe, with some guidance
+        - No, just suggesting

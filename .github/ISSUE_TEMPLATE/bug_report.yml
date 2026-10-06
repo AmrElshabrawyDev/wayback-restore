@@ -1,0 +1,39 @@
+name: 🐛 A site didn't restore well
+description: Something went wrong, or the restored content isn't right
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting! The domain and report usually tell us everything we need.
+  - type: input
+    id: domain
+    attributes:
+      label: Domain
+      description: The website you tried to restore
+      placeholder: example.com
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command or answers
+      description: The command you ran, or the options you picked in interactive mode
+      placeholder: npx @amrelshabrawydev/wayback-restore example.com --format json,md
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did you get instead?
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: report.json (optional)
+      description: Paste the relevant part of restored/report.json
+      render: json
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      placeholder: "Node 22.11, Windows 11 / macOS / Linux, wayback-restore 0.2.0"

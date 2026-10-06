@@ -1,39 +1,92 @@
+<div align="center">
+
+<img src="./assets/amr.svg" alt="wayback-restore logo" width="96" />
+
 # wayback-restore
 
-**Bring a lost website back from the Internet Archive** — posts, pages and images, with the original URLs, titles, meta descriptions and Arabic/RTL slugs intact — and get import-ready files for **Supabase, Prisma, PostgreSQL, MySQL, SQLite, MongoDB, Markdown, CSV or WordPress**.
+**Your website is gone. Its content doesn't have to be.**
 
-[![npm](https://img.shields.io/npm/v/@amrelshabrawydev/wayback-restore)](https://www.npmjs.com/package/@amrelshabrawydev/wayback-restore)
-[![CI](https://github.com/AmrElshabrawyDev/wayback-restore/actions/workflows/ci.yml/badge.svg)](https://github.com/AmrElshabrawyDev/wayback-restore/actions/workflows/ci.yml)
-[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+Bring a lost website back from the Internet Archive — posts, pages and images, with the original URLs, SEO data and Arabic/RTL slugs intact — and import it into **Supabase, Prisma, PostgreSQL, MySQL, SQLite, MongoDB, Markdown, CSV or WordPress**.
+
+[![npm](https://img.shields.io/npm/v/@amrelshabrawydev/wayback-restore?color=89b4fa&label=npm)](https://www.npmjs.com/package/@amrelshabrawydev/wayback-restore)
+[![Node](https://img.shields.io/badge/node-%E2%89%A520.18-94e2d5)](package.json)
+[![License: MIT](https://img.shields.io/badge/license-MIT-cba6f7)](LICENSE)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-a6e3a1)](CONTRIBUTING.md)
 
 ```bash
 npx @amrelshabrawydev/wayback-restore
 ```
 
-Run it with no arguments and it walks you through everything — no long commands to remember:
+<img src="docs/wizard.png" alt="wayback-restore interactive mode" width="760" />
 
-![wayback-restore interactive mode](docs/wizard.png)
+</div>
 
-## Why
+---
 
-A client's WordPress database was destroyed — no backup — while Google was still showing **182 of its articles** in search results. Those articles were the company's main source of customer calls. Rebuilding them by hand from the Wayback Machine would have taken weeks, and every day offline meant visitors landing on error pages.
+## 📖 Contents
 
-This tool is the reusable version of the scripts I wrote to bring that content back. It:
+- [The problem](#-the-problem)
+- [The solution](#-the-solution)
+- [Features](#-features)
+- [Quick start](#-quick-start)
+- [Exports](#%EF%B8%8F-exports)
+- [Options](#%EF%B8%8F-options)
+- [Use it from code](#-use-it-from-code)
+- [How it works](#-how-it-works)
+- [Good to know](#-good-to-know)
+- [Roadmap](#%EF%B8%8F-roadmap)
+- [Contributing](#-contributing)
+- [Let's connect](#-lets-connect)
 
-- **finds every archived page** of the domain through the Wayback CDX API and keeps the newest copy of each,
-- **skips noise** — tag/category archives, feeds, `wp-admin`, attachments, `?p=` links, files,
-- **extracts what matters for SEO**: title, meta description (Yoast / Rank Math), canonical, dates, author, categories, tags, featured image,
-- **cleans the article HTML**: removes share buttons, ads, table-of-contents widgets, comments, inline styles and page-builder wrappers; unwraps lazy-loaded images; keeps YouTube/Vimeo/Maps embeds,
-- **keeps your URLs**: slugs are decoded (`/نقل-عفش-الكويت/`, not `/%D9%86…/`) and internal links become root-relative,
-- **downloads the images** (archive first, then the live site), rewrites them to local paths, and **removes images that can't be found** instead of leaving broken `<img>` tags,
-- **caches every page**, so an interrupted run resumes without hitting the archive again,
-- **exports to the platform you use** — and never needs your database credentials (see [Exports](#exports)).
+## 🔥 The problem
 
-Read the full story: [How I recovered 182 articles from the Internet Archive](https://amrelshabrawydev.github.io/blog/wordpress-to-nextjs-arabic-migration) (Arabic) · [WordPress to Next.js migration without losing SEO](https://amrelshabrawydev.github.io/blog/wordpress-to-nextjs-migration-seo).
+Websites disappear more often than you'd think:
 
-## Quick start
+- the **database gets corrupted or wiped** and the last backup is months old — or never existed,
+- the site is **hacked**, and the clean version is gone,
+- **hosting expires**, the old developer vanishes, and nobody has the login,
+- a **redesign or migration** goes wrong and the old content is lost.
 
-Requires Node.js 20.18 or newer.
+The site is gone, but **Google still remembers it**. Old articles keep showing up in search results and keep sending visitors — straight to error pages. Every day offline, rankings fade and customers go to competitors.
+
+This happened to one of my clients: a moving company in Kuwait whose WordPress database was destroyed **with no backup**, while Google was still showing **182 of its Arabic articles** — the company's main source of customer calls.
+
+The content still existed in one place: the **[Internet Archive's Wayback Machine](https://web.archive.org)**. But copying 182 articles by hand — titles, meta descriptions, images, exact URLs — would take weeks, and the archived pages are full of theme clutter, broken lazy-loaded images and rewritten `web.archive.org` links.
+
+## 💡 The solution
+
+**wayback-restore** automates the whole recovery. You give it a domain; it gives you clean, import-ready content:
+
+1. **Finds** every page of the site the archive ever saved, and keeps the newest good copy of each.
+2. **Filters** out the noise — tag archives, feeds, admin pages, attachments, files.
+3. **Extracts** what matters: title, meta description, dates, author, categories, tags, featured image and the article itself.
+4. **Cleans** the article: no share buttons, ads, page-builder wrappers or archive links — just the content.
+5. **Recovers images** from the archive (or the live site), and removes the ones that are truly lost instead of leaving broken `<img>` tags.
+6. **Keeps your URLs** exactly as Google knows them — including Arabic slugs like `/نقل-عفش-الكويت/` — so your rankings survive.
+7. **Exports** to the platform you're moving to, with ready-to-run import files.
+
+That client's articles came back at their original addresses, on a new Next.js site. This tool is the reusable version of that recovery — read the full story: [How I recovered 182 articles from the Internet Archive](https://amrelshabrawydev.github.io/blog/wordpress-to-nextjs-arabic-migration) (Arabic) · [WordPress to Next.js migration without losing SEO](https://amrelshabrawydev.github.io/blog/wordpress-to-nextjs-migration-seo).
+
+## ✨ Features
+
+| | |
+|---|---|
+| 🧭 **Interactive mode** | Run it with no arguments and answer a few questions — like `create-next-app`. Starts with a safe 5-page test. |
+| 🔎 **Finds everything** | Lists every archived page through the Wayback CDX API and merges `http`/`https`/`www` duplicates. |
+| 🕰️ **Pick the right version** | Restore the latest copy, or the last one **before the site was hacked or redesigned** (`--to 2024-06`). |
+| 🧹 **Clean content** | Removes share buttons, ads, TOC widgets, comments, inline styles and Elementor/page-builder wrappers. Keeps YouTube/Vimeo/Maps embeds. |
+| 🏷️ **SEO preserved** | Title, meta description (Yoast / Rank Math), canonical, published & modified dates, categories, tags. |
+| 🔗 **Same URLs** | Original slugs kept and decoded (Arabic, RTL and any language); internal links become root-relative. |
+| 🖼️ **Image recovery** | Lazy-loaded images unwrapped, downloaded (archive → live site), paths rewritten; missing images removed cleanly. |
+| 🗄️ **10 export targets** | Supabase, Prisma, PostgreSQL, MySQL, SQLite, MongoDB, Markdown, CSV, JSON and WordPress (WXR). |
+| 🔒 **No credentials needed** | Never connects to your database. Generated import scripts read keys from environment variables only. |
+| ♻️ **Resumable** | Every page is cached — an interrupted run continues where it stopped, without hitting the archive again. |
+| 📋 **Clear report** | `report.json` lists what was restored, skipped (and why), failed, and which images are missing. |
+| 🤝 **Respectful** | Polite delays and retries with backoff, so the free Internet Archive isn't overloaded. |
+
+## 🚀 Quick start
+
+Requires **Node.js 20.18+**.
 
 **Interactive** (recommended):
 
@@ -41,61 +94,74 @@ Requires Node.js 20.18 or newer.
 npx @amrelshabrawydev/wayback-restore
 ```
 
-It asks for the domain, what the site was built with, where you'll import the content, which version of the site to use (e.g. *before it was hacked*), whether to download images — then offers a **quick 5-page test** before the full run, and prints the one-line command to repeat it.
+It asks for the domain, what the site was built with, where you'll import the content, which version of the site to use, which pages, and whether to download images — then offers a **quick 5-page test** before the full run, and prints the one-line command to repeat it.
 
 **One command** (scripts, CI):
 
 ```bash
-# see what would be restored (only queries the archive index)
+# see what would be restored — only queries the archive index
 npx @amrelshabrawydev/wayback-restore example.com --dry-run
 
-# try a few pages first
+# try 5 pages first
 npx @amrelshabrawydev/wayback-restore example.com --limit 5
 
 # restore everything for Supabase + Markdown
 npx @amrelshabrawydev/wayback-restore example.com --format supabase,md
 ```
 
-Install it globally to use the short `wayback-restore` command:
+Or install it once and use the short command:
 
 ```bash
 npm i -g @amrelshabrawydev/wayback-restore
 wayback-restore example.com
 ```
 
-## Exports
+### What you get
 
-Choose one or more with `--format` (or in interactive mode). Every export is a **file you run yourself** — the tool never connects to your database, so it never needs your passwords or keys.
+```
+restored/
+├── posts.json          # every post, newest first
+├── posts/              # Markdown files (with --format md)
+├── supabase/ prisma/ sql/ mongodb/ wordpress/   # per --format
+├── public/             # recovered images, mirroring their original paths
+│   └── wp-content/uploads/2023/05/team.jpg
+├── report.json         # restored / skipped / failed pages, missing images
+└── .cache/             # raw archived HTML (delete to re-download)
+```
+
+Copy `public/` into your app's `public/` folder and every image URL (`/wp-content/uploads/…`) keeps working unchanged.
+
+## 🗄️ Exports
+
+Choose one or more with `--format` (or in interactive mode). Every export is a **file you run yourself** — the tool never connects to your database.
 
 | `--format` | You get | How to import |
 |---|---|---|
 | `json` *(default)* | `posts.json` | Anything |
 | `md` | `posts/<slug>.md` with frontmatter | Copy into Next.js / Astro / Hugo / Jekyll content |
-| `supabase` | `supabase/migration.sql`, `supabase/import-posts.mjs` | Run the SQL in Supabase, then `SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node restored/supabase/import-posts.mjs` |
+| `supabase` | `supabase/migration.sql` (with RLS), `supabase/import-posts.mjs` | Run the SQL in Supabase, then `SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node restored/supabase/import-posts.mjs` |
 | `prisma` | `prisma/model.prisma`, `prisma/import-posts.mjs` | Add the model, `prisma migrate dev`, then `node restored/prisma/import-posts.mjs` |
 | `postgres` | `sql/posts.postgres.sql` | `psql "$DATABASE_URL" -f restored/sql/posts.postgres.sql` |
 | `mysql` | `sql/posts.mysql.sql` (utf8mb4) | `mysql -u user -p db < restored/sql/posts.mysql.sql` |
 | `sqlite` | `sql/posts.sqlite.sql` | `sqlite3 site.db < restored/sql/posts.sqlite.sql` |
 | `mongodb` | `mongodb/posts.ndjson` | `mongoimport --uri "$MONGODB_URI" --collection posts --file restored/mongodb/posts.ndjson` |
-| `csv` | `posts.csv` (UTF-8 with BOM, opens correctly in Excel) | Excel, Google Sheets, Airtable, Notion |
+| `csv` | `posts.csv` (UTF-8 BOM — Arabic opens correctly in Excel) | Excel, Google Sheets, Airtable, Notion |
 | `wordpress` | `wordpress/wordpress-export.xml` (WXR) | A fresh WordPress: **Tools → Import → WordPress** |
 
-All SQL files create the table if needed and **upsert on `slug`**, so you can run them again safely. Use `--table articles` to change the table name.
+All SQL files create the table if needed and **upsert on `slug`**, so running them twice is safe. `--table articles` changes the table name.
 
 Every database export uses the same columns:
 
 `slug` (primary key) · `path` · `title` · `excerpt` · `content` (HTML) · `featured_image` · `published_at` · `updated_at` · `author` · `categories` · `tags` · `lang` · `type` · `original_url` · `archived_at`
 
-Images are saved to `restored/public/…` mirroring their original paths (`/wp-content/uploads/2023/05/photo.jpg`), so you can copy the folder into your app's `public/` and every image URL keeps working.
-
-## Options
+## ⚙️ Options
 
 | Option | Default | Description |
 |---|---|---|
 | `-o, --out <dir>` | `restored` | Output folder |
-| `-f, --format <list>` | `json` | See [Exports](#exports) |
+| `-f, --format <list>` | `json` | See [Exports](#%EF%B8%8F-exports) |
 | `--table <name>` | `posts` | Table / collection name for database exports |
-| `--from <date>` / `--to <date>` | — | Only use snapshots in this range (`2023`, `2023-05`, `20230501`) — e.g. the last copy *before the site was hacked* |
+| `--from <date>` / `--to <date>` | — | Only use snapshots in this range (`2023`, `2023-05`, `20230501`) |
 | `--include <regex>` | — | Only restore paths matching this pattern, e.g. `"^/blog/"` |
 | `--exclude <regex>` | — | Skip paths matching this pattern |
 | `--types <list>` | `post,page,unknown` | Page types to keep |
@@ -105,12 +171,12 @@ Images are saved to `restored/public/…` mirroring their original paths (`/wp-c
 | `--image-base <url>` | `""` | Prefix for rewritten image URLs, e.g. `https://cdn.example.com` |
 | `--image-source <list>` | `archive,live` | Where to look for images, in order |
 | `--keep-missing-images` | — | Keep `<img>` tags whose image couldn't be downloaded |
-| `--delay <ms>` | `1500` | Pause between archive requests — please be gentle with the Internet Archive |
+| `--delay <ms>` | `1500` | Pause between archive requests |
 | `--dry-run` | — | Only list the pages that would be restored |
 | `-i, --interactive` | — | Ask questions (the default when no domain is given) |
 | `-q, --quiet` | — | Less output |
 
-## Use it from code
+## 🧩 Use it from code
 
 ```js
 import { restore } from "@amrelshabrawydev/wayback-restore";
@@ -126,46 +192,92 @@ const { posts, report } = await restore({
 
 Lower-level helpers are exported too: `listSnapshots`, `extractPost`, `restoreImages`, `exportPosts`, `toSql`, `toCsv`, `toMongoNdjson`, `toWxr`, `toMarkdown`, `isContentUrl`, `unwrapWaybackUrl`, `slugFromUrl`.
 
-### Serving the old URLs in Next.js
-
-Keep WordPress's trailing slashes so every URL Google knows stays identical, and decode Arabic slugs before looking them up:
+**Keeping the old URLs in Next.js** — match WordPress's trailing slashes and decode Arabic slugs before looking them up:
 
 ```js
 // next.config.js
 export default { trailingSlash: true };
-```
 
-```tsx
 // app/[slug]/page.tsx
-export default async function Post({ params }) {
-  const slug = decodeURIComponent((await params).slug);
-  // …find the post by slug
-}
+const slug = decodeURIComponent((await params).slug);
 ```
 
-## Good to know
+## 🔬 How it works
+
+```mermaid
+flowchart LR
+    A[Domain] --> B[CDX API<br/>list snapshots]
+    B --> C[Filter &<br/>newest copy per page]
+    C --> D[Fetch raw page<br/>id_ snapshot · cached]
+    D --> E[Extract & clean<br/>title · SEO · article]
+    E --> F[Recover images<br/>archive → live]
+    F --> G[Export<br/>JSON · SQL · Supabase · …]
+```
+
+| File | Responsibility |
+|---|---|
+| `src/cdx.js` | Lists archived pages via the CDX API (paginated), keeps the newest snapshot per page |
+| `src/urls.js` | URL normalizing, slug decoding, Wayback URL unwrapping, WordPress noise filter |
+| `src/extract.js` | Turns an archived page into a clean post (selectors for themes & page builders) |
+| `src/images.js` | Downloads images, rewrites paths, removes missing ones |
+| `src/exporters.js` | All export formats — one object per platform |
+| `src/index.js` | `restore()` — runs the pipeline, caching and the report |
+| `src/cli/` | Interactive wizard and banner |
+
+## 📝 Good to know
 
 - **The archive doesn't have everything.** Some pages or images were never captured, or only an older version was. Check `report.json` and review your most important pages by hand.
 - **Only restore content you own** (or have permission to restore).
-- **Be gentle with the Internet Archive** — it's a free, non-profit service. Keep the default delay, and use the quick test / `--dry-run` first. If it saved you, [consider donating](https://archive.org/donate).
+- **Be gentle with the Internet Archive** — it's a free, non-profit service. Keep the default delay and test with `--limit` / `--dry-run` first. If it saved your site, [consider donating](https://archive.org/donate). 💙
 - The tool only reads public snapshots: no logins, no API keys.
 
-## Roadmap
+## 🗺️ Roadmap
 
-WordPress sites work today; other platforms come in the next releases. See [ROADMAP.md](ROADMAP.md) — ideas and pull requests welcome.
+WordPress works today. Next up: automatic platform detection, Blogger, Ghost, Wix, then online stores (Shopify, WooCommerce, Salla, Zid), redirect maps and sitemaps. See **[ROADMAP.md](ROADMAP.md)**.
 
-## Development
+## 🤝 Contributing
+
+**You don't need to be an expert to help** — some of the most useful contributions are small:
+
+- 🐛 **Found a site that doesn't restore well?** [Open an issue](https://github.com/AmrElshabrawyDev/wayback-restore/issues/new/choose) with the domain — that alone helps a lot.
+- 🧩 **Know a theme or page builder?** Add its selectors to `src/extract.js` with a test fixture.
+- 🗄️ **Use a platform we don't export to yet?** An exporter is a single object in `src/exporters.js`.
+- 🌍 **Write docs or translate** — Arabic, French, Spanish… anything that helps more people recover their sites.
+- ⭐ **Star the repo** so others can find it.
 
 ```bash
 git clone https://github.com/AmrElshabrawyDev/wayback-restore.git
 cd wayback-restore
 npm install
-npm test
-node bin/cli.js          # interactive mode
+npm test            # runs offline against a fake archive
+node bin/cli.js     # interactive mode
 ```
 
-Tests run offline against a fake archive. `WAYBACK_ENDPOINT=http://localhost:8080` points the tool at a local mirror for manual testing.
+Read **[CONTRIBUTING.md](CONTRIBUTING.md)** for the project structure, how to add an extractor or exporter, and how pull requests are reviewed. Every contributor is credited in the release notes. First pull request ever? You're very welcome here — I'll help you get it merged. 🙌
 
-## License
+---
 
-[MIT](LICENSE) © [Amr Elshabrawy](https://amrelshabrawydev.github.io)
+## 🌐 Let's Connect
+
+<div align="center">
+
+Built this because I needed it for a real client — if it helped you, I'd love to hear about it.<br/>
+Questions, ideas, or a site you need rescued? **Reach out anytime.**
+
+<br/>
+
+[![Portfolio](https://img.shields.io/badge/Portfolio-1E66F5?style=for-the-badge&logo=googlechrome&logoColor=white)](https://amrelshabrawydev.github.io)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amr-elshabrawy-dev)
+[![WhatsApp](https://img.shields.io/badge/WhatsApp-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)](https://wa.me/201202546653?text=Hi%20Amr!%20I%20found%20wayback-restore%20on%20GitHub)
+[![Email](https://img.shields.io/badge/Email-EA4335?style=for-the-badge&logo=gmail&logoColor=white)](mailto:amrelshabrawy.dev@gmail.com)
+[![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/AmrElshabrawyDev)
+[![X](https://img.shields.io/badge/X-000000?style=for-the-badge&logo=x&logoColor=white)](https://x.com/AmrElshabr43803)
+
+<br/><br/>
+
+<a href="https://amrelshabrawydev.github.io"><img src="./assets/amr.svg" alt="Amr Elshabrawy logo" width="72" /></a>
+
+<sub>Made with 💙 and ☕ in Egypt by <a href="https://amrelshabrawydev.github.io"><strong>Amr Elshabrawy</strong></a> · Freelance React &amp; Next.js Developer</sub><br/>
+<sub><a href="LICENSE">MIT License</a> © 2026 · Keep building 🚀</sub>
+
+</div>
