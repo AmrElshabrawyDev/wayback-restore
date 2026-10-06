@@ -2,11 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
 import { banner } from "../src/cli/banner.js";
 import { platformOptions, toCommand, validateDate, validateDomain, validateTable } from "../src/cli/wizard.js";
 
 const run = promisify(execFile);
-const CLI = new URL("../bin/cli.js", import.meta.url).pathname;
+const CLI = fileURLToPath(new URL("../bin/cli.js", import.meta.url));
 
 test("validateDomain accepts real domains, including Arabic ones", () => {
   for (const ok of ["example.com", "https://www.example.com/blog/", "sub.example.co.uk", "موقع.السعودية"]) {

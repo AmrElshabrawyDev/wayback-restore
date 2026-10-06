@@ -329,7 +329,7 @@ export const EXPORTERS = [
     hint: "Next.js, Astro, Hugo, Jekyll · frontmatter + body",
     write: async (posts, { outDir }) => {
       const files = [];
-      for (const post of posts) files.push(path.relative(outDir, await writeMarkdown(post, outDir)));
+      for (const post of posts) files.push(path.relative(outDir, await writeMarkdown(post, outDir)).split(path.sep).join("/"));
       return files;
     },
   },
