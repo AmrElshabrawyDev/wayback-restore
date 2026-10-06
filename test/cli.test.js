@@ -4,7 +4,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { banner } from "../src/cli/banner.js";
-import { humanDate, platformOptions, toCommand, validateDate, validateDomain, validateTable } from "../src/cli/wizard.js";
+import { fitLine, humanDate, platformOptions, toCommand, validateDate, validateDomain, validateTable } from "../src/cli/wizard.js";
 
 const run = promisify(execFile);
 const CLI = fileURLToPath(new URL("../bin/cli.js", import.meta.url));
@@ -70,4 +70,10 @@ test("humanDate", () => {
   assert.equal(humanDate("2023-09-01"), "1 Sep 2023");
   assert.equal(humanDate("2024-05-23"), "23 May 2024");
   assert.equal(humanDate(undefined), "");
+});
+
+test("fitLine keeps progress messages on one line", () => {
+  assert.equal(fitLine("short", 10), "short");
+  assert.equal(fitLine("أفكار سحرية لحماية الزجاج", 10), "أفكار سحر…");
+  assert.equal([...fitLine("x".repeat(200), 40)].length, 40);
 });

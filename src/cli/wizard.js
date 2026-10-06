@@ -70,6 +70,17 @@ export function platformOptions() {
   return [...ready, { value: "__soon", label: pc.dim("── coming soon ──"), disabled: true }, ...soon];
 }
 
+/**
+ * Shorten text to fit one terminal line. A progress line that wraps can't be
+ * redrawn in place, so every spinner frame would print a new line.
+ */
+export const fitLine = (text, width) => {
+  const chars = [...String(text)];
+  return chars.length <= width ? chars.join("") : `${chars.slice(0, Math.max(width - 1, 1)).join("")}…`;
+};
+
+const BAR_SIZE = 24;
+
 const NEXT_STEPS = {
   json: (dir) => `${pc.bold("JSON")}: ${dir}/posts.json`,
   md: (dir) => `${pc.bold("Markdown")}: copy ${dir}/posts/ into your content folder (Next.js, Astro, Hugo…)`,
@@ -209,7 +220,7 @@ export async function runWizard({ version }) {
           );
         }
         if (!options.dryRun && candidates > 0) {
-          bar = p.progress({ max: Math.min(candidates, options.limit) });
+          bar = p.progress({ max: Math.min(candidates, options.limit), size: BAR_SIZE });
           bar.start("Restoring pages");
         }
       },
@@ -217,7 +228,11 @@ export async function runWizard({ version }) {
         if (status === "restored") restored++;
         const step = status === "restored" || !Number.isFinite(options.limit) ? 1 : 0;
         const icon = status === "restored" ? pc.green("✓") : status === "skipped" ? pc.dim("–") : pc.red("✗");
-        bar?.advance(step, `${icon} ${pc.dim(`${humanDate(archivedAt)} copy`)}  ${title || decodeURI(path)}`);
+        const copy = `${humanDate(archivedAt)} copy`;
+        // room left after "◒  " + bar + " " + icon + date, and the "..." clack adds at the end
+        const room = (process.stdout.columns || 80) - (3 + BAR_SIZE + 1) - (2 + copy.length + 2) - 4;
+        const name = room >= 6 ? `  ${fitLine(title || decodeURI(path), room)}` : "";
+        bar?.advance(step, `${icon} ${pc.dim(copy)}${name}`);
       },
     });
     bar?.stop(`Restored ${restored} pages`);

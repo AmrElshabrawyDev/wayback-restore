@@ -48,5 +48,7 @@ export function banner({ version, stream = process.stdout } = {}) {
     "",
   ];
 
+  // narrow terminal: name and tagline under the logo instead of beside it
+  if ((stream.columns ?? 80) < 80) return `\n${logo.map((line) => `  ${line}`).join("\n")}\n${side.filter(Boolean).map((line) => `  ${line}`).join("\n")}\n`;
   return `\n${logo.map((line, i) => `  ${line}   ${side[i] ?? ""}`).join("\n")}\n`;
 }
