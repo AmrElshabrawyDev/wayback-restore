@@ -153,3 +153,36 @@ test("images report the archived copy the archive actually served (any year)", a
   const result = await downloadImage("https://example.com/wp-content/uploads/a.png", path.join(outDir, "a.png"), { timestamp: "20230510120000", delay: 0, fetchImpl });
   assert.deepEqual(result, { source: "archive", archivedAt: "2024-05-22" });
 });
+
+test("WordPress placeholder pages are skipped and mixed site versions are reported", async (t) => {
+  const outDir = await mkdtemp(path.join(tmpdir(), "wwr-mixed-"));
+  t.after(() => rm(outDir, { recursive: true, force: true }));
+  const page = (title, site) =>
+    `<html><head><meta name="generator" content="WordPress 6.5"><title>${title} – ${site}</title></head>` +
+    `<body class="single-post"><article><div class="entry-content"><p>${"كلمة ".repeat(80)}</p></div></article></body></html>`;
+  const pages = {
+    "old-post-1": ["20220501000000", page("Old post one", "Original Site")],
+    "old-post-2": ["20250716000000", page("Old post two", "Original Site")],
+    "new-post": ["20260216000000", page("Fresh start", "New Owner")],
+    "sample-page": ["20260216000000", page("Sample Page", "New Owner")],
+    "hello-world": ["20260216000000", page("Hello world!", "New Owner")],
+  };
+  const fetchImpl = async (url) => {
+    if (url.includes("/cdx/")) {
+      const rows = [["original", "timestamp", "statuscode", "mimetype"], ...Object.entries(pages).map(([slug, [ts]]) => [`https://example.com/${slug}/`, ts, "200", "text/html"])];
+      return new Response(JSON.stringify(rows), { headers: { "content-type": "application/json" } });
+    }
+    const slug = url.match(/example\.com\/([^/]+)\//)?.[1];
+    return new Response(pages[slug][1], { headers: { "content-type": "text/html" } });
+  };
+  const lines = [];
+  const { report } = await restore({ domain: "example.com", outDir, delay: 0, images: false, fetchImpl, log: (l) => lines.push(l) });
+
+  assert.deepEqual(report.skipped.map((s) => s.reason), ["wordpress-default", "wordpress-default"]);
+  assert.equal(report.restored, 3);
+  assert.deepEqual(report.siteNames, [
+    { name: "Original Site", pages: 2, from: "2022-05-01", to: "2025-07-16" },
+    { name: "New Owner", pages: 1, from: "2026-02-16", to: "2026-02-16" },
+  ]);
+  assert.ok(lines.some((l) => /--to <date before it happened>/.test(l)));
+});

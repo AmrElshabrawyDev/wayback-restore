@@ -60,6 +60,25 @@ async function fetchSnapshot(snapshot, { cacheDir, fetchImpl, log, delay }) {
   return { html, cached: false };
 }
 
+/** The placeholder content of a fresh WordPress install — a sign the copy is from after the site was wiped */
+const WORDPRESS_DEFAULT_SLUGS = new Set(["sample-page", "hello-world"]);
+const WORDPRESS_DEFAULT_TITLE = /^(sample page|hello world!?)(\s|$)/i;
+const isWordPressDefault = (post) => WORDPRESS_DEFAULT_SLUGS.has(post.slug?.replace(/\/$/, "")) || WORDPRESS_DEFAULT_TITLE.test(post.title || "");
+
+/** Site names of the restored pages, most common first, with the dates of their copies */
+function siteNames(pages) {
+  const byName = new Map();
+  for (const page of pages) {
+    if (!page.siteName) continue;
+    const entry = byName.get(page.siteName) ?? { name: page.siteName, pages: 0, from: page.archivedAt, to: page.archivedAt };
+    entry.pages++;
+    if (page.archivedAt < entry.from) entry.from = page.archivedAt;
+    if (page.archivedAt > entry.to) entry.to = page.archivedAt;
+    byName.set(page.siteName, entry);
+  }
+  return [...byName.values()].sort((a, b) => b.pages - a.pages);
+}
+
 /**
  * Restore every archived post/page of a domain.
  * @param {object} options see README → "Options"
@@ -134,6 +153,7 @@ export async function restore(options) {
       const isHome = post.type === "home";
       const skip =
         isHome && post.platform === "wordpress" ? "homepage"
+        : post.platform === "wordpress" && isWordPressDefault(post) ? "wordpress-default"
         : post.spaShell ? "spa-shell"
         : !isHome && !opts.types.includes(post.type) ? `type:${post.type}`
         : !post.html ? "no-content"
@@ -165,7 +185,7 @@ export async function restore(options) {
 
       posts.push(post);
       report.restored++;
-      report.pages.push({ url: snapshot.original, title: post.title, archivedAt, archiveUrl: post.archiveUrl });
+      report.pages.push({ url: snapshot.original, title: post.title, siteName: post.siteName, archivedAt, archiveUrl: post.archiveUrl });
       log(`${progress} ${cached ? "cached " : ""}✓ ${post.title || post.path}`);
       onProgress({ index, total: candidates.length, status: "restored", path: post.path, title: post.title, archivedAt });
     } catch (error) {
@@ -181,6 +201,13 @@ export async function restore(options) {
   report.images.missing = [...new Set(report.images.missing)];
   // the copies the restored pages actually came from
   report.version.used = snapshotRange(report.pages);
+  // different site names usually mean some copies are from after the site was replaced
+  report.siteNames = siteNames(report.pages);
+  if (report.siteNames.length > 1) {
+    log(`Warning: the restored pages come from ${report.siteNames.length} different sites:`);
+    for (const s of report.siteNames) log(`  "${s.name}" — ${s.pages} pages, ${s.from} to ${s.to}`);
+    log("If the site was hacked, wiped or replaced, run again with --to <date before it happened>.");
+  }
   report.finishedAt = new Date().toISOString();
   await writeReport(report, outDir);
   return { posts, report };

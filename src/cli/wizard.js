@@ -232,6 +232,16 @@ export async function runWizard({ version }) {
         const more = report.pages.length > 10 ? `\n${pc.dim(`…and ${report.pages.length - 10} more — every page's date and archive link are in report.json`)}` : "";
         p.note(`${shown.join("\n")}${more}`, "Restored pages · archived copy used");
       }
+      if (report.siteNames?.length > 1) {
+        p.log.warn(
+          [
+            `${pc.bold("These pages come from different versions of the site:")}`,
+            ...report.siteNames.map((s) => `  “${s.name}” — ${s.pages} page${s.pages === 1 ? "" : "s"}, ${humanDate(s.from)} → ${humanDate(s.to)}`),
+            pc.dim("If the site was hacked, wiped or replaced, run again and choose"),
+            pc.dim("“A copy from before a certain date” with a date before it happened."),
+          ].join("\n"),
+        );
+      }
       p.note(
         [
           `${pc.green("✓")} ${report.restored} restored   ${pc.dim(`${report.skipped.length} skipped`)}   ${report.failed.length ? pc.red(`${report.failed.length} failed`) : "0 failed"}`,

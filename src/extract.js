@@ -149,6 +149,12 @@ function cleanTitle(title, siteName) {
   return out.trim();
 }
 
+/** "Post title – Site name" → "Site name" (used only to notice when a site changed owner or name) */
+function titleSuffix(title) {
+  const parts = String(title || "").replace(/\s+/g, " ").trim().split(/ [|–—-] /);
+  return parts.length > 1 ? parts.at(-1).trim() || undefined : undefined;
+}
+
 /** Lazy-loaded images keep the real URL in data-* attributes or srcset */
 function realImageSource($img) {
   const candidates = [
@@ -293,6 +299,7 @@ export function extractPost(html, { original, timestamp, domain, platform = "aut
     author: meta($, "author", "article:author") || $(".author .fn, .author-name, [rel='author']").first().text().trim() || undefined,
     categories: unique($("a[rel~='category']").map((_, el) => $(el).text().trim()).get()),
     tags: unique($("a[rel='tag']").map((_, el) => $(el).text().trim()).get()),
+    siteName: siteName || titleSuffix($("title").first().text()),
     lang: $("html").attr("lang"),
     dir: $("html").attr("dir"),
     featuredImage,

@@ -281,6 +281,7 @@ flowchart LR
 
 - **The archive doesn't have everything.** Some pages or images were never captured, or only an older version was. Check `report.json` and review your most important pages by hand.
 - **Each page and image comes from its own copy.** The archive saves every URL separately, on different days — one page may be from 2022 and another from 2024. `report.json` → `pages[].archiveUrl` opens the exact copy that was used. Images use the copy closest to their page's date, from any year.
+- **Was the site wiped, hacked or taken over?** The *latest* copy may be the broken or new site. The tool skips WordPress placeholder pages (*Sample Page*, *Hello world!*) and warns when the restored pages carry **different site names** — then run again with `--to <a date before it happened>`.
 - **Checking the archive yourself?** On web.archive.org use `*` instead of a year (`/web/*/example.com/wp-content/uploads/*`) — a year in the URL only shows that year's captures.
 - **Only restore content you own** (or have permission to restore).
 - **Be gentle with the Internet Archive** — it's a free, non-profit service. Keep the default delay and test with `--limit` / `--dry-run` first. If it saved your site, [consider donating](https://archive.org/donate). 💙
