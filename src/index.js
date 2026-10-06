@@ -82,8 +82,11 @@ export async function restore(options) {
 
   log(`Listing archived pages of ${domain}…`);
   const snapshots = await listSnapshots(domain, { from: opts.from, to: opts.to, fetchImpl, log });
-  const candidates = snapshots.filter((s) => isContentUrl(s.original, opts)).slice(0, opts.limit);
+  const candidates = snapshots.filter((s) => isContentUrl(s.original, opts));
   log(`Found ${snapshots.length} archived pages, ${candidates.length} look like posts/pages.`);
+  // --limit counts restored pages, so skipped ones (homepage, too short…) don't use up a quick test
+  const limited = Number.isFinite(opts.limit);
+  if (limited && !opts.dryRun) log(`Stopping after ${opts.limit} restored pages.`);
 
   const report = {
     domain,
@@ -100,12 +103,14 @@ export async function restore(options) {
   const posts = [];
 
   if (opts.dryRun) {
+    if (limited) candidates.splice(opts.limit);
     for (const s of candidates) log(`  ${s.timestamp}  ${s.original}`);
     report.finishedAt = new Date().toISOString();
     return { posts, report, candidates };
   }
 
   for (const [index, snapshot] of candidates.entries()) {
+    if (report.restored >= opts.limit) break;
     const progress = `[${index + 1}/${candidates.length}]`;
     try {
       const { html, cached } = await fetchSnapshot(snapshot, { cacheDir, fetchImpl, log, delay: opts.delay });

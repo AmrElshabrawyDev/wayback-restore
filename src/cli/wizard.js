@@ -205,7 +205,8 @@ export async function runWizard({ version }) {
       },
       onProgress: ({ status, title, path }) => {
         if (status === "restored") restored++;
-        bar?.advance(1, `${status === "restored" ? pc.green("✓") : status === "skipped" ? pc.dim("–") : pc.red("✗")} ${title || decodeURI(path)}`);
+        const step = status === "restored" || !Number.isFinite(options.limit) ? 1 : 0;
+        bar?.advance(step, `${status === "restored" ? pc.green("✓") : status === "skipped" ? pc.dim("–") : pc.red("✗")} ${title || decodeURI(path)}`);
       },
     });
     bar?.stop(`Restored ${restored} pages`);

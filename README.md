@@ -217,7 +217,7 @@ Every database export uses the same columns:
 | `--exclude <regex>` | — | Skip paths matching this pattern |
 | `--types <list>` | `post,page,unknown` | Page types to keep |
 | `--min-words <n>` | `50` | Skip near-empty pages |
-| `--limit <n>` | — | Restore at most *n* pages |
+| `--limit <n>` | — | Stop after *n* restored pages — skipped ones (homepage, too short…) don't count |
 | `--no-images` | — | Don't download images |
 | `--image-base <url>` | `""` | Prefix for rewritten image URLs, e.g. `https://cdn.example.com` |
 | `--image-source <list>` | `archive,live` | Where to look for images, in order |

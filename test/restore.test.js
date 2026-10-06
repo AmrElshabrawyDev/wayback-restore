@@ -104,6 +104,19 @@ test("re-runs use the cache instead of hitting the archive again", async (t) => 
   assert.ok(!second.calls.some((url) => url.includes("team-1024x683")));
 });
 
+test("--limit counts restored pages and stops once it's reached", async (t) => {
+  const outDir = await mkdtemp(path.join(tmpdir(), "wwr-limit-"));
+  t.after(() => rm(outDir, { recursive: true, force: true }));
+  const { fetchImpl, calls } = fakeArchive();
+
+  // the homepage comes first and is skipped, so a limit of 1 must keep going to the real post
+  const { report } = await restore({ domain: "example.com", outDir, delay: 0, images: false, limit: 1, include: /^\/($|%|[^a-z])/i, fetchImpl });
+  assert.equal(report.restored, 1);
+  assert.equal(report.candidates, 2);
+  assert.deepEqual(report.skipped.map((s) => s.reason), ["homepage"]);
+  assert.ok(!calls.some((url) => url.includes("thin-page") || url.includes("broken")), "stopped after the limit");
+});
+
 test("dry run lists candidates without downloading pages", async (t) => {
   const outDir = await mkdtemp(path.join(tmpdir(), "wwr-"));
   t.after(() => rm(outDir, { recursive: true, force: true }));

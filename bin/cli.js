@@ -33,7 +33,7 @@ ${EXPORTERS.map((e) => `                             ${e.id.padEnd(10)} ${e.hint
       --exclude <regex>    Skip paths matching this pattern
       --types <list>       Page types to keep: post,page,unknown (default: all three)
       --min-words <n>      Skip pages with fewer words (default: 50)
-      --limit <n>          Restore at most n pages (handy for a first test)
+      --limit <n>          Stop after n restored pages (skipped ones don't count)
       --no-images          Don't download images
       --image-base <url>   Prefix for rewritten image URLs, e.g. https://cdn.example.com
       --image-source <s>   archive, live or archive,live (default: archive,live)
