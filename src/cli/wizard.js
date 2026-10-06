@@ -8,6 +8,13 @@ import { EXPORTERS } from "../exporters.js";
 import { PLATFORMS } from "../platforms.js";
 import { restore } from "../index.js";
 import { normalizeDomain } from "../urls.js";
+
+/** "2024-05-23" → "23 May 2024" */
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+export const humanDate = (date) => {
+  const [, y, m, d] = String(date || "").match(/^(\d{4})-(\d{2})-(\d{2})/) || [];
+  return y ? `${Number(d)} ${MONTHS[m - 1]} ${y}` : "";
+};
 import { banner } from "./banner.js";
 
 /** Stop cleanly when the user presses Ctrl+C / Esc */
@@ -192,21 +199,25 @@ export async function runWizard({ version }) {
   try {
     const result = await restore({
       ...options,
-      log: (line) => {
-        const found = line.match(/^Found (\d+) archived pages, (\d+) look like/);
-        if (found) {
-          spinning = false;
-          spin.stop(`Found ${found[1]} archived pages, ${pc.bold(found[2])} look like posts/pages`);
-          if (!options.dryRun && Number(found[2]) > 0) {
-            bar = p.progress({ max: Math.min(Number(found[2]), options.limit) });
-            bar.start("Restoring pages");
-          }
+      onStart: ({ archivedPages, candidates, version }) => {
+        spinning = false;
+        spin.stop(`Found ${archivedPages} archived pages, ${pc.bold(candidates)} look like posts/pages`);
+        if (version.from) {
+          p.log.info(
+            `${pc.bold("Version:")} the ${version.mode}\n` +
+              `${pc.dim("Archived copies from")} ${pc.cyan(humanDate(version.from))} ${pc.dim("to")} ${pc.cyan(humanDate(version.to))}`,
+          );
+        }
+        if (!options.dryRun && candidates > 0) {
+          bar = p.progress({ max: Math.min(candidates, options.limit) });
+          bar.start("Restoring pages");
         }
       },
-      onProgress: ({ status, title, path }) => {
+      onProgress: ({ status, title, path, archivedAt }) => {
         if (status === "restored") restored++;
         const step = status === "restored" || !Number.isFinite(options.limit) ? 1 : 0;
-        bar?.advance(step, `${status === "restored" ? pc.green("✓") : status === "skipped" ? pc.dim("–") : pc.red("✗")} ${title || decodeURI(path)}`);
+        const icon = status === "restored" ? pc.green("✓") : status === "skipped" ? pc.dim("–") : pc.red("✗");
+        bar?.advance(step, `${icon} ${pc.dim(`${humanDate(archivedAt)} copy`)}  ${title || decodeURI(path)}`);
       },
     });
     bar?.stop(`Restored ${restored} pages`);
@@ -216,10 +227,16 @@ export async function runWizard({ version }) {
       const list = (result.candidates || []).slice(0, 15).map((s) => `  ${decodeURI(new URL(s.original).pathname)}`);
       p.note(`${list.join("\n")}${report.candidates > 15 ? `\n  …and ${report.candidates - 15} more` : ""}`, `${report.candidates} pages would be restored`);
     } else {
+      if (report.pages.length) {
+        const shown = report.pages.slice(0, 10).map((pg) => `${pc.cyan(humanDate(pg.archivedAt).padEnd(11))}  ${pg.title || decodeURI(new URL(pg.url).pathname)}`);
+        const more = report.pages.length > 10 ? `\n${pc.dim(`…and ${report.pages.length - 10} more — every page's date and archive link are in report.json`)}` : "";
+        p.note(`${shown.join("\n")}${more}`, "Restored pages · archived copy used");
+      }
       p.note(
         [
           `${pc.green("✓")} ${report.restored} restored   ${pc.dim(`${report.skipped.length} skipped`)}   ${report.failed.length ? pc.red(`${report.failed.length} failed`) : "0 failed"}`,
           options.images ? `${pc.green("✓")} ${report.images.downloaded} images downloaded   ${pc.dim(`${report.images.missing.length} missing`)}` : null,
+          report.version.used ? `${pc.cyan("◷")} archived copies from ${humanDate(report.version.used.from)} to ${humanDate(report.version.used.to)}` : null,
           "",
           ...formats.map((f) => NEXT_STEPS[f]?.(outDir, table)).filter(Boolean),
           "",

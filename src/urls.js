@@ -25,6 +25,18 @@ export function safeDecode(value) {
   }
 }
 
+/** "20240523101500" → "2024-05-23" */
+export const archiveDate = (timestamp) => String(timestamp || "").replace(/^(\d{4})(\d{2})(\d{2}).*$/, "$1-$2-$3");
+
+/** Timestamp of a Wayback URL (after redirects, it's the copy that was actually served) */
+export const timestampFromWaybackUrl = (url) => String(url || "").match(/\/web\/(\d{14})/)?.[1];
+
+/** Oldest and newest copy in a list of snapshots, as YYYY-MM-DD */
+export function snapshotRange(snapshots) {
+  const stamps = snapshots.map((s) => s.timestamp || s.archivedAt).filter(Boolean).sort();
+  return stamps.length ? { from: archiveDate(stamps[0]), to: archiveDate(stamps.at(-1)) } : null;
+}
+
 /** Raw archived page, without the Wayback toolbar or rewritten links */
 export const snapshotUrl = (timestamp, original) => `${WAYBACK}/web/${timestamp}id_/${original}`;
 

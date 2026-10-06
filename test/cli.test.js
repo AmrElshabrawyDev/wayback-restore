@@ -4,7 +4,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { banner } from "../src/cli/banner.js";
-import { platformOptions, toCommand, validateDate, validateDomain, validateTable } from "../src/cli/wizard.js";
+import { humanDate, platformOptions, toCommand, validateDate, validateDomain, validateTable } from "../src/cli/wizard.js";
 
 const run = promisify(execFile);
 const CLI = fileURLToPath(new URL("../bin/cli.js", import.meta.url));
@@ -64,4 +64,10 @@ test("CLI: --version, --help and argument errors", async () => {
   await assert.rejects(run("node", [CLI, "example.com", "--platform", "drupal"]), (e) => /unknown --platform drupal/.test(e.stderr));
   await assert.rejects(run("node", [CLI, "example.com", "--platform", "ghost"]), (e) => /coming soon/.test(e.stderr));
   await assert.rejects(run("node", [CLI, "example.com", "--limit", "abc"]), (e) => /--limit must be a positive number/.test(e.stderr));
+});
+
+test("humanDate", () => {
+  assert.equal(humanDate("2023-09-01"), "1 Sep 2023");
+  assert.equal(humanDate("2024-05-23"), "23 May 2024");
+  assert.equal(humanDate(undefined), "");
 });

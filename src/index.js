@@ -13,7 +13,7 @@ import { extractPost } from "./extract.js";
 import { fetchWithRetry, sleep } from "./http.js";
 import { restoreImages } from "./images.js";
 import { writeReport } from "./output.js";
-import { isContentUrl, normalizeDomain, snapshotUrl } from "./urls.js";
+import { archiveDate, isContentUrl, normalizeDomain, snapshotRange, snapshotUrl } from "./urls.js";
 
 export { listSnapshots } from "./cdx.js";
 export { EXPORTERS, EXPORTER_IDS, exportPosts, toCsv, toMongoNdjson, toRecord, toSql, toWxr } from "./exporters.js";
@@ -21,7 +21,7 @@ export { extractPost, originalImageUrl } from "./extract.js";
 export { PLATFORMS, PLATFORM_IDS, detectPlatform, isSpaShell } from "./platforms.js";
 export { restoreImages, downloadImage } from "./images.js";
 export { toMarkdown } from "./output.js";
-export { isContentUrl, normalizeDomain, slugFromUrl, unwrapWaybackUrl, urlPath } from "./urls.js";
+export { archiveDate, isContentUrl, normalizeDomain, slugFromUrl, snapshotRange, unwrapWaybackUrl, urlPath } from "./urls.js";
 
 const DEFAULTS = {
   outDir: "restored",
@@ -72,6 +72,7 @@ export async function restore(options) {
   const { fetchImpl } = opts;
   const log = opts.log ?? (() => {});
   const onProgress = opts.onProgress ?? (() => {});
+  const onStart = opts.onStart ?? (() => {});
   // the Prisma import script reads posts.json
   const formats = opts.formats.includes("prisma") && !opts.formats.includes("json") ? ["json", ...opts.formats] : opts.formats;
 
@@ -84,6 +85,12 @@ export async function restore(options) {
   const snapshots = await listSnapshots(domain, { from: opts.from, to: opts.to, fetchImpl, log });
   const candidates = snapshots.filter((s) => isContentUrl(s.original, opts));
   log(`Found ${snapshots.length} archived pages, ${candidates.length} look like posts/pages.`);
+  // which copies of the site we're working from
+  const version = {
+    mode: opts.to ? `last copy of each page before ${opts.to}` : "latest copy of each page",
+    ...snapshotRange(candidates),
+  };
+  if (version.from) log(`Using the ${version.mode} — archived between ${version.from} and ${version.to}.`);
   // --limit counts restored pages, so skipped ones (homepage, too short…) don't use up a quick test
   const limited = Number.isFinite(opts.limit);
   if (limited && !opts.dryRun) log(`Stopping after ${opts.limit} restored pages.`);
@@ -93,14 +100,19 @@ export async function restore(options) {
     startedAt: new Date().toISOString(),
     archivedPages: snapshots.length,
     candidates: candidates.length,
+    version,
     restored: 0,
+    // every restored page with the exact archived copy it came from (open archiveUrl to compare)
+    pages: [],
     skipped: [],
     failed: [],
-    images: { downloaded: 0, missing: [] },
+    images: { downloaded: 0, missing: [], found: [] },
     // how many pages looked like each platform (useful with platform "auto")
     platforms: {},
   };
   const posts = [];
+
+  onStart({ archivedPages: snapshots.length, candidates: candidates.length, version, limit: opts.limit });
 
   if (opts.dryRun) {
     if (limited) candidates.splice(opts.limit);
@@ -111,7 +123,8 @@ export async function restore(options) {
 
   for (const [index, snapshot] of candidates.entries()) {
     if (report.restored >= opts.limit) break;
-    const progress = `[${index + 1}/${candidates.length}]`;
+    const archivedAt = archiveDate(snapshot.timestamp);
+    const progress = `[${index + 1}/${candidates.length}] ${archivedAt}`;
     try {
       const { html, cached } = await fetchSnapshot(snapshot, { cacheDir, fetchImpl, log, delay: opts.delay });
       let post = extractPost(html, { ...snapshot, domain, platform: opts.platform });
@@ -127,9 +140,9 @@ export async function restore(options) {
         : wordCount(post.html) < opts.minWords ? "too-short"
         : null;
       if (skip) {
-        report.skipped.push({ url: snapshot.original, reason: skip });
+        report.skipped.push({ url: snapshot.original, reason: skip, archivedAt });
         log(`${progress} skip (${skip}) ${post.path}`);
-        onProgress({ index, total: candidates.length, status: "skipped", path: post.path });
+        onProgress({ index, total: candidates.length, status: "skipped", path: post.path, archivedAt });
         continue;
       }
 
@@ -147,16 +160,18 @@ export async function restore(options) {
         post = result.post;
         report.images.downloaded += result.downloaded;
         report.images.missing.push(...result.missing);
+        report.images.found.push(...result.found);
       }
 
       posts.push(post);
       report.restored++;
+      report.pages.push({ url: snapshot.original, title: post.title, archivedAt, archiveUrl: post.archiveUrl });
       log(`${progress} ${cached ? "cached " : ""}✓ ${post.title || post.path}`);
-      onProgress({ index, total: candidates.length, status: "restored", path: post.path, title: post.title });
+      onProgress({ index, total: candidates.length, status: "restored", path: post.path, title: post.title, archivedAt });
     } catch (error) {
-      report.failed.push({ url: snapshot.original, error: error.message });
+      report.failed.push({ url: snapshot.original, error: error.message, archivedAt });
       log(`${progress} ✗ ${snapshot.original} (${error.message})`);
-      onProgress({ index, total: candidates.length, status: "failed", path: snapshot.original });
+      onProgress({ index, total: candidates.length, status: "failed", path: snapshot.original, archivedAt });
     }
   }
 
@@ -164,6 +179,8 @@ export async function restore(options) {
   posts.sort((a, b) => (b.publishedAt || b.archivedAt).localeCompare(a.publishedAt || a.archivedAt));
   report.files = await exportPosts(posts, { formats, outDir, table: opts.table, domain });
   report.images.missing = [...new Set(report.images.missing)];
+  // the copies the restored pages actually came from
+  report.version.used = snapshotRange(report.pages);
   report.finishedAt = new Date().toISOString();
   await writeReport(report, outDir);
   return { posts, report };

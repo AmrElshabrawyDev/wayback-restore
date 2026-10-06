@@ -8,7 +8,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import * as cheerio from "cheerio";
 import { fetchWithRetry, sleep } from "./http.js";
-import { fileSnapshotUrl, isSameSite, urlPath } from "./urls.js";
+import { archiveDate, fileSnapshotUrl, isSameSite, timestampFromWaybackUrl, urlPath } from "./urls.js";
 
 const IMAGE_TYPE = /^image\//i;
 
@@ -30,11 +30,13 @@ const exists = (file) =>
 
 /**
  * Download one image. Tries the archived copy (closest to the page's
- * snapshot), then the live URL. Skips files that already exist.
- * @returns {Promise<"exists"|"archive"|"live"|null>} where it came from, or null if not found
+ * snapshot — the archive redirects to the nearest copy from any year), then the
+ * live URL. Skips files that already exist.
+ * @returns {Promise<{ source: "exists"|"archive"|"live", archivedAt?: string }|null>}
+ *   where it came from (and which archived copy), or null if not found
  */
 export async function downloadImage(imageUrl, file, { timestamp, sources = ["archive", "live"], delay = 500, fetchImpl, log }) {
-  if (await exists(file)) return "exists";
+  if (await exists(file)) return { source: "exists" };
   for (const source of sources) {
     const url = source === "archive" ? fileSnapshotUrl(timestamp, imageUrl) : imageUrl;
     try {
@@ -49,7 +51,9 @@ export async function downloadImage(imageUrl, file, { timestamp, sources = ["arc
       await fs.mkdir(path.dirname(file), { recursive: true });
       await fs.writeFile(file, buffer);
       await sleep(delay);
-      return source;
+      if (source !== "archive") return { source };
+      // after the redirect, the URL names the copy that was actually served
+      return { source, archivedAt: archiveDate(timestampFromWaybackUrl(response.url) || timestamp) };
     } catch (error) {
       log?.(`  image ${source} failed: ${imageUrl} (${error.message})`);
     } finally {
@@ -63,21 +67,25 @@ export async function downloadImage(imageUrl, file, { timestamp, sources = ["arc
  * Download all of a post's same-site images and point the HTML at them.
  * @param {object} post from extractPost()
  * @param {object} options { imagesDir, domain, imageBase, keepMissing, sources, delay, fetchImpl, log }
- * @returns {Promise<{ post: object, downloaded: number, missing: string[] }>}
+ * @returns {Promise<{ post: object, downloaded: number, missing: string[], found: object[] }>}
  */
 export async function restoreImages(post, { imagesDir, domain, imageBase = "", keepMissing = false, ...download }) {
   const $ = cheerio.load(post.html, null, false);
   const urls = new Set([...post.images, post.featuredImage].filter((url) => url && isSameSite(url, domain)));
   const localUrl = new Map();
   const missing = [];
+  const found = [];
   let downloaded = 0;
 
   for (const imageUrl of urls) {
     const file = localImagePath(imageUrl, imagesDir);
     if (!file) continue;
-    const source = await downloadImage(imageUrl, file, { timestamp: post.archivedAt, ...download });
-    if (source) {
-      if (source !== "exists") downloaded++;
+    const result = await downloadImage(imageUrl, file, { timestamp: post.archivedAt, ...download });
+    if (result) {
+      if (result.source !== "exists") {
+        downloaded++;
+        found.push({ url: imageUrl, from: result.source, ...(result.archivedAt && { archivedAt: result.archivedAt }) });
+      }
       localUrl.set(imageUrl, imageBase.replace(/\/$/, "") + urlPath(imageUrl).replace(/\/$/, ""));
     } else {
       missing.push(imageUrl);
@@ -106,5 +114,6 @@ export async function restoreImages(post, { imagesDir, domain, imageBase = "", k
     },
     downloaded,
     missing,
+    found,
   };
 }

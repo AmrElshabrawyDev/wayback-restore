@@ -4,7 +4,7 @@ import { mkdtemp, readFile, readdir, rm, access } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { restore } from "../src/index.js";
+import { downloadImage, restore } from "../src/index.js";
 
 const POST = readFileSync(new URL("./fixtures/post.html", import.meta.url), "utf8");
 const ARABIC = "%D9%86%D9%82%D9%84-%D8%B9%D9%81%D8%B4-%D8%A7%D9%84%D9%83%D9%88%D9%8A%D8%AA";
@@ -71,6 +71,13 @@ test("restores posts, images, markdown and a report end to end", async (t) => {
 
   // report
   assert.equal(report.restored, 1);
+  // which archived copies were used
+  assert.equal(report.version.mode, "latest copy of each page");
+  assert.deepEqual(report.version.used, { from: "2023-05-10", to: "2023-05-10" });
+  assert.equal(report.pages[0].archivedAt, "2023-05-10");
+  assert.match(report.pages[0].archiveUrl, /^https:\/\/web\.archive\.org\/web\/20230510120000\//);
+  assert.deepEqual(report.images.found.map((i) => i.from).sort(), ["archive", "live"]);
+  assert.equal(report.images.found.find((i) => i.from === "archive").archivedAt, "2023-05-10");
   assert.equal(report.images.downloaded, 2);
   assert.deepEqual(report.images.missing, ["https://example.com/wp-content/uploads/2023/05/missing.jpg"]);
   assert.deepEqual(report.skipped.map((s) => s.reason).sort(), ["homepage", "too-short"]);
@@ -132,4 +139,17 @@ test("dry run lists candidates without downloading pages", async (t) => {
 
 test("rejects an invalid domain", async () => {
   await assert.rejects(restore({ domain: "not a domain" }), /Invalid domain/);
+});
+
+test("images report the archived copy the archive actually served (any year)", async (t) => {
+  const outDir = await mkdtemp(path.join(tmpdir(), "wwr-img-"));
+  t.after(() => rm(outDir, { recursive: true, force: true }));
+  // the page is from 2023, the archive redirects the image to its 2024 copy
+  const fetchImpl = async (url) => {
+    const response = new Response(PNG, { headers: { "content-type": "image/png" } });
+    Object.defineProperty(response, "url", { value: url.replace("20230510120000", "20240522093000") });
+    return response;
+  };
+  const result = await downloadImage("https://example.com/wp-content/uploads/a.png", path.join(outDir, "a.png"), { timestamp: "20230510120000", delay: 0, fetchImpl });
+  assert.deepEqual(result, { source: "archive", archivedAt: "2024-05-22" });
 });
