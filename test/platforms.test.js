@@ -71,6 +71,7 @@ test("framework build files aren't treated as pages", () => {
     "https://app.example/static/js/main.123.js",
     "https://app.example/assets/index-B4x9.js",
     "https://acme.example/api/contact",
+    "https://old.example/cgi-sys/defaultwebpage.cgi",
   ]) {
     assert.ok(!isContentUrl(url), url);
   }

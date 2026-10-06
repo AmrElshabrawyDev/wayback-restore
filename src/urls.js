@@ -67,7 +67,7 @@ export const pageKey = (url) => urlPath(url).toLowerCase();
 const NON_CONTENT_PATH = [
   /^\/wp-(admin|content|includes|json|login|cron)/i,
   // framework build output and endpoints (Next.js, React, Vite, Cloudflare)
-  /^\/(_next|static\/(js|css|media)|assets|api|cdn-cgi|__nextjs)\//i,
+  /^\/(_next|static\/(js|css|media)|assets|api|cdn-cgi|cgi-sys|cgi-bin|__nextjs)\//i,
   /\/(feed|rss2?|atom|amp|embed|trackback|comments?|xmlrpc\.php)\/?$/i,
   /\/(tag|category|author|search|page|attachment)\//i,
   /\/(cart|checkout|my-account|basket)\//i,
