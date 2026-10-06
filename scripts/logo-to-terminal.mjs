@@ -4,12 +4,12 @@
  *
  * Only needed when the logo changes. Uses Playwright's Chromium to render the SVG:
  *   npx playwright install chromium   (once)
- *   node scripts/logo-to-terminal.mjs [size=26]
+ *   node scripts/logo-to-terminal.mjs [size=28]
  */
 import { readFile, writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
 
-const size = Number(process.argv[2] || 26);
+const size = Number(process.argv[2] || 28);
 const svg = await readFile(new URL("../assets/logo.svg", import.meta.url), "utf8");
 
 const browser = await chromium.launch();
