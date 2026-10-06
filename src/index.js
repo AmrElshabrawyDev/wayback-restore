@@ -18,6 +18,7 @@ import { isContentUrl, normalizeDomain, snapshotUrl } from "./urls.js";
 export { listSnapshots } from "./cdx.js";
 export { EXPORTERS, EXPORTER_IDS, exportPosts, toCsv, toMongoNdjson, toRecord, toSql, toWxr } from "./exporters.js";
 export { extractPost, originalImageUrl } from "./extract.js";
+export { PLATFORMS, PLATFORM_IDS, detectPlatform, isSpaShell } from "./platforms.js";
 export { restoreImages, downloadImage } from "./images.js";
 export { toMarkdown } from "./output.js";
 export { isContentUrl, normalizeDomain, slugFromUrl, unwrapWaybackUrl, urlPath } from "./urls.js";
@@ -26,6 +27,7 @@ const DEFAULTS = {
   outDir: "restored",
   types: ["post", "page", "unknown"],
   formats: ["json"],
+  platform: "auto",
   table: "posts",
   images: true,
   imageBase: "",
@@ -92,6 +94,8 @@ export async function restore(options) {
     skipped: [],
     failed: [],
     images: { downloaded: 0, missing: [] },
+    // how many pages looked like each platform (useful with platform "auto")
+    platforms: {},
   };
   const posts = [];
 
@@ -105,11 +109,15 @@ export async function restore(options) {
     const progress = `[${index + 1}/${candidates.length}]`;
     try {
       const { html, cached } = await fetchSnapshot(snapshot, { cacheDir, fetchImpl, log, delay: opts.delay });
-      let post = extractPost(html, { ...snapshot, domain });
+      let post = extractPost(html, { ...snapshot, domain, platform: opts.platform });
+      report.platforms[post.platform] = (report.platforms[post.platform] ?? 0) + 1;
 
+      // a WordPress homepage is just a list of posts; on other sites it's a real page
+      const isHome = post.type === "home";
       const skip =
-        !post.slug ? "homepage"
-        : !opts.types.includes(post.type) ? `type:${post.type}`
+        isHome && post.platform === "wordpress" ? "homepage"
+        : post.spaShell ? "spa-shell"
+        : !isHome && !opts.types.includes(post.type) ? `type:${post.type}`
         : !post.html ? "no-content"
         : wordCount(post.html) < opts.minWords ? "too-short"
         : null;

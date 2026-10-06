@@ -1,12 +1,14 @@
 /**
- * Extracts a clean post from an archived WordPress page: title, SEO meta,
- * dates, featured image and the article HTML without theme/plugin clutter.
+ * Extracts a clean post from an archived page — WordPress, Next.js, React or
+ * a hand-coded HTML site: title, SEO meta, dates, featured image and the main
+ * content without theme, navigation or plugin clutter.
  */
 import * as cheerio from "cheerio";
+import { detectPlatform, isSpaShell } from "./platforms.js";
 import { isSameSite, slugFromUrl, unwrapWaybackUrl, urlPath } from "./urls.js";
 
 /** Where WordPress themes and page builders put the article body, most specific first */
-const CONTENT_SELECTORS = [
+const WORDPRESS_SELECTORS = [
   ".entry-content",
   ".post-content",
   ".single-post-content",
@@ -19,6 +21,45 @@ const CONTENT_SELECTORS = [
   "article",
   "main",
   "#content",
+];
+
+/** Hand-coded, Next.js and React sites: semantic containers first, the whole page last */
+const GENERIC_SELECTORS = [
+  "article",
+  "main",
+  "[role='main']",
+  "#main",
+  "#content",
+  ".content",
+  ".main-content",
+  "#__next",
+  "#root",
+  "#app",
+  "body",
+];
+
+const CONTENT_SELECTORS = { wordpress: WORDPRESS_SELECTORS };
+
+/** Page-level containers hold the site's chrome too — strip it when we fall back to them */
+const LAYOUT_CONTAINERS = new Set(["main", "[role='main']", "#main", "#content", ".content", ".main-content", "#__next", "#root", "#app", "body"]);
+const LAYOUT_JUNK = [
+  "header",
+  "nav",
+  "footer",
+  "aside",
+  "[role='banner']",
+  "[role='navigation']",
+  "[role='contentinfo']",
+  "[role='dialog']",
+  ".navbar",
+  ".site-header",
+  ".site-footer",
+  ".menu",
+  ".skip-link",
+  "[class*='cookie']",
+  "[id*='cookie']",
+  "#__next-route-announcer__",
+  "next-route-announcer",
 ];
 
 /** Theme and plugin clutter inside the article body */
@@ -133,33 +174,47 @@ function largestFromSrcset(srcset) {
   return items.sort((a, b) => b.size - a.size)[0]?.url;
 }
 
+/** Next.js serves images through /_next/image?url=/photo.jpg&w=1080 — point at the original file */
+export function unwrapNextImage(url) {
+  try {
+    const parsed = new URL(url);
+    const inner = parsed.pathname === "/_next/image" && parsed.searchParams.get("url");
+    return inner ? new URL(inner, parsed.origin).href : url;
+  } catch {
+    return url;
+  }
+}
+
 /** Remove the "-300x200" size suffix WordPress adds to resized images */
 export const originalImageUrl = (url) => url.replace(/-\d{2,5}x\d{2,5}(\.[a-z0-9]{3,4})(?=$|[?#])/i, "$1");
 
 /**
  * Turn an archived page into a post.
  * @param {string} html raw HTML of the archived page
- * @param {{ original: string, timestamp: string, domain: string }} snapshot
+ * @param {{ original: string, timestamp: string, domain: string, platform?: string }} snapshot
+ *   platform: "wordpress" | "nextjs" | "react" | "static" | "auto" (default: detect)
  */
-export function extractPost(html, { original, timestamp, domain }) {
+export function extractPost(html, { original, timestamp, domain, platform = "auto" }) {
+  const detected = platform === "auto" ? detectPlatform(html) : platform;
   const $ = cheerio.load(html);
 
   const siteName = meta($, "og:site_name");
   const rawTitle =
     meta($, "og:title", "twitter:title") ||
     $("h1.entry-title, h1.post-title, .entry-header h1, article h1").first().text() ||
-    $("title").first().text();
-  const title = cleanTitle(rawTitle, siteName) || cleanTitle($("title").first().text(), siteName);
+    $("title").first().text() ||
+    $("h1").first().text();
+  const title = cleanTitle(rawTitle, siteName) || cleanTitle($("title").first().text(), siteName) || cleanTitle($("h1").first().text());
 
+  const path = urlPath(original);
+  const isHome = path === "/" || /^\/index\.html?\/$/i.test(path);
   const bodyClass = $("body").attr("class") || "";
   const ogType = meta($, "og:type");
-  const type = /\bhome\b/.test(bodyClass) || urlPath(original) === "/"
-    ? "home"
-    : /\bsingle-post\b|\bsingle\b/.test(bodyClass) || ogType === "article"
-      ? "post"
-      : /\bpage\b/.test(bodyClass)
-        ? "page"
-        : "unknown";
+  const type =
+    /\bhome\b/.test(bodyClass) || isHome ? "home"
+    : /\bsingle-post\b|\bsingle\b/.test(bodyClass) || ogType === "article" ? "post"
+    : /\bpage\b/.test(bodyClass) || detected !== "wordpress" ? "page"
+    : "unknown";
 
   const resolve = (url) => resolveUrl(unwrapWaybackUrl(url), original);
 
@@ -169,24 +224,30 @@ export function extractPost(html, { original, timestamp, domain }) {
   // --- article body ---
   // prefer a container with real text (themes often leave empty ".entry-content" wrappers),
   // otherwise the first one that has any text at all
-  const containers = CONTENT_SELECTORS.map((selector) => $(selector).first()).filter(($el) => $el.length);
-  const $content =
-    containers.find(($el) => $el.text().trim().length > 80) ??
-    containers.find(($el) => $el.text().trim()) ??
-    $();
+  const selectors = CONTENT_SELECTORS[detected] ?? GENERIC_SELECTORS;
+  const containers = selectors
+    .map((selector) => ({ selector, $el: $(selector).first() }))
+    .filter(({ $el }) => $el.length);
+  const chosen =
+    containers.find(({ $el }) => $el.text().trim().length > 80) ??
+    containers.find(({ $el }) => $el.text().trim());
+  const $content = chosen?.$el ?? $();
 
   let contentHtml = "";
   const images = [];
   if ($content.length) {
+    // a page-level container also holds the site's header, menu and footer
+    if (LAYOUT_CONTAINERS.has(chosen.selector)) $content.find(LAYOUT_JUNK.join(",")).remove();
     $content.find(JUNK_SELECTORS.join(",")).remove();
-    // the title is stored separately
-    $content.find("h1").first().remove();
+    // the title is stored separately — drop the heading only when it repeats it
+    const $h1 = $content.find("h1").first();
+    if ($h1.length && (detected === "wordpress" || sameText($h1.text(), title))) $h1.remove();
 
     $content.find("img").each((_, el) => {
       const $img = $(el);
       const src = realImageSource($img);
       if (!src) return void $img.remove();
-      const absolute = resolve(src);
+      const absolute = unwrapNextImage(resolve(src));
       $img.attr("src", absolute);
       images.push(absolute);
     });
@@ -214,13 +275,16 @@ export function extractPost(html, { original, timestamp, domain }) {
     contentHtml = contentHtml.trim();
   }
 
-  const featuredImage = featuredRaw ? resolve(featuredRaw) : images[0];
+  const featuredImage = featuredRaw ? unwrapNextImage(resolve(featuredRaw)) : images[0];
 
   return {
     url: unwrapWaybackUrl(original),
-    path: urlPath(original),
-    slug: slugFromUrl(original),
+    path,
+    slug: isHome ? "" : slugFromUrl(original),
     type,
+    platform: detected,
+    // a client-rendered app whose content was never in the archived HTML
+    spaShell: detected !== "wordpress" && isSpaShell(html),
     title,
     description: meta($, "description", "og:description", "twitter:description"),
     canonical: canonical ? resolve(canonical) : undefined,
@@ -294,3 +358,11 @@ function removeEmptyElements($, $root) {
 }
 
 const unique = (list) => [...new Set(list.filter(Boolean))];
+
+const normalizeText = (s = "") => s.replace(/\s+/g, " ").trim().toLowerCase();
+/** "About us" vs "About us | Acme" → same heading */
+const sameText = (a, b) => {
+  const x = normalizeText(a);
+  const y = normalizeText(b);
+  return Boolean(x && y && (x === y || y.startsWith(x) || x.startsWith(y)));
+};

@@ -6,7 +6,7 @@
 
 **Your website is gone. Its content doesn't have to be.**
 
-Bring a lost website back from the Internet Archive — posts, pages and images, with the original URLs, SEO data and Arabic/RTL slugs intact — and import it into **Supabase, Prisma, PostgreSQL, MySQL, SQLite, MongoDB, Markdown, CSV or WordPress**.
+Bring a lost website back from the Internet Archive — **WordPress, Next.js, React or plain HTML/CSS/JS** — posts, pages and images, with the original URLs, SEO data and Arabic/RTL slugs intact — and import it into **Supabase, Prisma, PostgreSQL, MySQL, SQLite, MongoDB, Markdown, CSV or WordPress**.
 
 [![npm](https://img.shields.io/npm/v/@amrelshabrawydev/wayback-restore?color=89b4fa&label=npm)](https://www.npmjs.com/package/@amrelshabrawydev/wayback-restore)
 [![Node](https://img.shields.io/badge/node-%E2%89%A520.18-94e2d5)](package.json)
@@ -28,6 +28,7 @@ npx @amrelshabrawydev/wayback-restore
 - [The problem](#-the-problem)
 - [The solution](#-the-solution)
 - [Features](#-features)
+- [Supported sites](#-supported-sites)
 - [Quick start](#-quick-start)
 - [Exports](#%EF%B8%8F-exports)
 - [Options](#%EF%B8%8F-options)
@@ -72,6 +73,7 @@ That client's articles came back at their original addresses, on a new Next.js s
 | | |
 |---|---|
 | 🧭 **Interactive mode** | Run it with no arguments and answer a few questions — like `create-next-app`. Starts with a safe 5-page test. |
+| 🧱 **Any kind of site** | WordPress, Next.js, React and hand-coded HTML/CSS/JS — detected automatically for every page. |
 | 🔎 **Finds everything** | Lists every archived page through the Wayback CDX API and merges `http`/`https`/`www` duplicates. |
 | 🕰️ **Pick the right version** | Restore the latest copy, or the last one **before the site was hacked or redesigned** (`--to 2024-06`). |
 | 🧹 **Clean content** | Removes share buttons, ads, TOC widgets, comments, inline styles and Elementor/page-builder wrappers. Keeps YouTube/Vimeo/Maps embeds. |
@@ -83,6 +85,54 @@ That client's articles came back at their original addresses, on a new Next.js s
 | ♻️ **Resumable** | Every page is cached — an interrupted run continues where it stopped, without hitting the archive again. |
 | 📋 **Clear report** | `report.json` lists what was restored, skipped (and why), failed, and which images are missing. |
 | 🤝 **Respectful** | Polite delays and retries with backoff, so the free Internet Archive isn't overloaded. |
+
+## 🧱 Supported sites
+
+<div align="center">
+
+<img src="https://skillicons.dev/icons?i=wordpress,nextjs,html,css,js,react&theme=dark" alt="WordPress, Next.js, HTML, CSS, JavaScript, React" />
+
+</div>
+
+<br/>
+
+| | Built with | Status | What comes back |
+|:---:|---|:---:|---|
+| <img src="https://skillicons.dev/icons?i=wordpress" width="36" alt="WordPress" /> | **WordPress** | ✅ Ready | Posts & pages, Yoast / Rank Math SEO, dates, categories, tags, featured image — page-builder clutter removed |
+| <img src="https://skillicons.dev/icons?i=nextjs" width="36" alt="Next.js" /> | **Next.js** | ✅ Ready | Every server-rendered or static page, without header/nav/footer; `/_next/image` URLs turned back into the original images |
+| <img src="https://skillicons.dev/icons?i=html,css,js" width="108" alt="HTML, CSS, JavaScript" /> | **HTML · CSS · JavaScript** | ✅ Ready | Hand-coded sites and static generators (Hugo, Jekyll, Astro…): `about.html`-style URLs, the homepage, relative images |
+| <img src="https://skillicons.dev/icons?i=react" width="36" alt="React" /> | **React (SPA)** | 🧪 Beta | Pages the archive saved with their content (pre-rendered / SSR). Empty client-side shells are skipped and listed in `report.json` |
+| 🔎 | **Not sure?** | ✅ Default | `--platform auto` detects the platform **for each page** and counts them in `report.json` |
+| 🔜 | Blogger · Ghost · Wix · Squarespace | Soon | Planned for v0.4 — see the [roadmap](ROADMAP.md) |
+| 🛒 | Shopify · Salla · Zid · WooCommerce | Soon | Products and collections — v0.5 |
+
+```bash
+npx @amrelshabrawydev/wayback-restore my-next-site.com --platform nextjs --format md
+npx @amrelshabrawydev/wayback-restore old-portfolio.com --platform static
+```
+
+In interactive mode it's the second question — pick one, or **Not sure** to let the tool decide:
+
+<div align="center"><img src="docs/platforms.png" alt="Choosing the platform in interactive mode" width="720" /></div>
+
+<details>
+<summary><b>How is the platform detected?</b></summary>
+
+<br/>
+
+| Platform | Signals in the archived HTML |
+|---|---|
+| WordPress | `<meta name="generator" content="WordPress">`, `/wp-content/`, `wp-json` |
+| Next.js | `__NEXT_DATA__`, `/_next/static/`, App Router `self.__next_f` |
+| React (SPA) | An empty `#root` / `#app` mount, `/static/js/main.*.js` (Create React App), `/assets/index-*.js` (Vite) |
+| HTML · CSS · JS | Anything else |
+
+Build files (`/_next/`, `/static/js/`, `/assets/`, `/api/`) are never mistaken for pages.
+
+</details>
+
+> [!NOTE]
+> **Why is React "beta"?** A single-page React app loads its content with JavaScript *after* the page opens, so the Internet Archive often saved only an empty `<div id="root">`. There's nothing to restore in those pages — the tool tells you so instead of producing blank posts. React sites built with **Next.js, Gatsby or Remix** are server-rendered and restore fine.
 
 ## 🚀 Quick start
 
@@ -158,6 +208,7 @@ Every database export uses the same columns:
 
 | Option | Default | Description |
 |---|---|---|
+| `-p, --platform <name>` | `auto` | `wordpress`, `nextjs`, `static`, `react` or `auto` — see [Supported sites](#-supported-sites) |
 | `-o, --out <dir>` | `restored` | Output folder |
 | `-f, --format <list>` | `json` | See [Exports](#%EF%B8%8F-exports) |
 | `--table <name>` | `posts` | Table / collection name for database exports |
@@ -222,6 +273,7 @@ flowchart LR
 | `src/images.js` | Downloads images, rewrites paths, removes missing ones |
 | `src/exporters.js` | All export formats — one object per platform |
 | `src/index.js` | `restore()` — runs the pipeline, caching and the report |
+| `src/platforms.js` | Supported platforms list and automatic detection |
 | `src/cli/` | Interactive wizard and banner |
 
 ## 📝 Good to know
@@ -233,7 +285,7 @@ flowchart LR
 
 ## 🗺️ Roadmap
 
-WordPress works today. Next up: automatic platform detection, Blogger, Ghost, Wix, then online stores (Shopify, WooCommerce, Salla, Zid), redirect maps and sitemaps. See **[ROADMAP.md](ROADMAP.md)**.
+WordPress, Next.js, plain HTML/CSS/JS and React (beta) work today. Next up: Blogger, Ghost, Wix, then online stores (Shopify, WooCommerce, Salla, Zid), redirect maps and sitemaps. See **[ROADMAP.md](ROADMAP.md)**.
 
 ## 🤝 Contributing
 

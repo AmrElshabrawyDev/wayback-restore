@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { restore } from "../src/index.js";
 import { EXPORTERS, EXPORTER_IDS } from "../src/exporters.js";
 import { banner } from "../src/cli/banner.js";
+import { PLATFORMS, PLATFORM_IDS } from "../src/platforms.js";
 
 const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 
@@ -16,9 +17,12 @@ Examples
   wayback-restore example.com --dry-run
   wayback-restore example.com --format json,md --limit 5
   wayback-restore example.com --format supabase,postgres --table articles
+  wayback-restore my-next-site.com --platform nextjs --format md
   wayback-restore example.com --to 2024-06 --include "^/blog/"
 
 Options
+  -p, --platform <name>    What the site was built with (default: auto):
+${PLATFORMS.filter((x) => x.status !== "soon").map((x) => `                             ${x.id.padEnd(10)} ${x.label}${x.status === "beta" ? " (beta)" : ""} · ${x.hint}`).join("\n")}
   -o, --out <dir>          Output folder (default: restored)
   -f, --format <list>      Comma-separated, default json:
 ${EXPORTERS.map((e) => `                             ${e.id.padEnd(10)} ${e.hint}`).join("\n")}
@@ -62,6 +66,7 @@ try {
   parsed = parseArgs({
     allowPositionals: true,
     options: {
+      platform: { type: "string", short: "p" },
       out: { type: "string", short: "o" },
       format: { type: "string", short: "f" },
       table: { type: "string" },
@@ -118,8 +123,15 @@ const formats = values.format ? list(values.format) : undefined;
 const unknown = formats?.filter((f) => !EXPORTER_IDS.includes(f));
 if (unknown?.length) fail(`unknown --format ${unknown.join(", ")}. Available: ${EXPORTER_IDS.join(", ")}`);
 
+const platform = values.platform?.trim().toLowerCase();
+if (platform && !PLATFORM_IDS.includes(platform)) {
+  const soon = PLATFORMS.find((x) => x.id === platform && x.status === "soon");
+  fail(soon ? `${soon.label} support is coming soon — see ROADMAP.md` : `unknown --platform ${values.platform}. Available: ${PLATFORM_IDS.join(", ")}`);
+}
+
 const options = {
   domain: positionals[0],
+  platform,
   outDir: values.out,
   formats,
   table: values.table,

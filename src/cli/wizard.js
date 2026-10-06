@@ -5,6 +5,7 @@
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { EXPORTERS } from "../exporters.js";
+import { PLATFORMS } from "../platforms.js";
 import { restore } from "../index.js";
 import { normalizeDomain } from "../urls.js";
 import { banner } from "./banner.js";
@@ -35,6 +36,7 @@ export const validateTable = (value) =>
 /** Equivalent one-line command, so the same restore can be repeated without questions */
 export function toCommand(o) {
   const args = [o.domain];
+  if (o.platform && o.platform !== "auto") args.push("--platform", o.platform);
   if (o.outDir !== "restored") args.push("--out", o.outDir);
   if (o.formats.join(",") !== "json") args.push("--format", o.formats.join(","));
   if (o.table && o.table !== "posts") args.push("--table", o.table);
@@ -43,6 +45,22 @@ export function toCommand(o) {
   if (!o.images) args.push("--no-images");
   if (o.limit && Number.isFinite(o.limit)) args.push("--limit", String(o.limit));
   return `npx @amrelshabrawydev/wayback-restore ${args.join(" ")}`;
+}
+
+/** Platform list for the "built with" question: ready ones first, then a dimmed "coming soon" group */
+export function platformOptions() {
+  const tag = (status) => (status === "beta" ? ` ${pc.yellow("beta")}` : "");
+  const ready = PLATFORMS.filter((x) => x.status !== "soon").map((x) => ({
+    value: x.id,
+    label: `${x.label}${tag(x.status)}`,
+    hint: x.hint,
+  }));
+  const soon = PLATFORMS.filter((x) => x.status === "soon").map((x) => ({
+    value: x.id,
+    label: pc.dim(x.label),
+    disabled: true,
+  }));
+  return [...ready, { value: "__soon", label: pc.dim("── coming soon ──"), disabled: true }, ...soon];
 }
 
 const NEXT_STEPS = {
@@ -73,18 +91,22 @@ export async function runWizard({ version }) {
     ),
   );
 
-  answer(
+  const platform = answer(
     await p.select({
       message: "What was the site built with?",
-      options: [
-        { value: "wordpress", label: "WordPress", hint: "best results" },
-        { value: "generic", label: "Something else / not sure", hint: "generic extraction (beta)" },
-        { value: "blogger", label: "Blogger", hint: "coming soon", disabled: true },
-        { value: "ghost", label: "Ghost", hint: "coming soon", disabled: true },
-        { value: "shopify", label: "Shopify / Salla / Zid (products)", hint: "coming soon", disabled: true },
-      ],
+      options: platformOptions(),
+      maxItems: 12,
     }),
   );
+  if (platform === "react") {
+    p.note(
+      "Single-page React apps load their content with JavaScript after the page opens,\n" +
+        "so the archive often saved only an empty shell. Pages that were pre-rendered\n" +
+        "(or React sites built with Next.js / Gatsby) restore fine — empty shells are\n" +
+        `skipped and listed in ${pc.bold("report.json")}.`,
+      "Heads-up about React apps",
+    );
+  }
 
   const formats = answer(
     await p.multiselect({
@@ -150,6 +172,7 @@ export async function runWizard({ version }) {
 
   const options = {
     domain,
+    platform,
     formats,
     table,
     to,

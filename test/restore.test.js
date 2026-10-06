@@ -35,7 +35,7 @@ function fakeArchive() {
     if (url.includes(`id_/https://www.example.com/${ARABIC}/`)) return respond(POST);
     if (url.includes("id_/https://example.com/thin-page/")) return respond("<html><body class='page'><main><p>Too short to keep.</p></main></body></html>");
     if (url.includes("id_/https://example.com/broken/")) return respond("Not found", { status: 404 });
-    if (url.includes("id_/https://example.com/")) return respond(`<html><body class="home"><main>${"x ".repeat(100)}</main></body></html>`);
+    if (url.includes("id_/https://example.com/")) return respond(`<html><head><meta name="generator" content="WordPress 6.5"></head><body class="home"><main>${"x ".repeat(100)}</main></body></html>`);
     // images: the team photo exists in the archive, the truck only on the live site, "missing" nowhere
     if (url.includes("im_/https://example.com/wp-content/uploads/2023/05/team-1024x683.jpg")) return respond(PNG, { type: "image/jpeg" });
     if (url === "https://example.com/wp-content/uploads/2023/05/moving-truck.jpg") return respond(PNG, { type: "image/jpeg" });
