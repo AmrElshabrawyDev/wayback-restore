@@ -18,7 +18,7 @@ body:
     attributes:
       label: Command or answers
       description: The command you ran, or the options you picked in interactive mode
-      placeholder: npx @amrelshabrawydev/wayback-restore example.com --format json,md
+      placeholder: npx @amrelshabrawy/wayback-restore example.com --format json,md
   - type: textarea
     id: what-happened
     attributes:

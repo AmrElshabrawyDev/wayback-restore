@@ -1,7 +1,7 @@
 /**
  * wayback-restore — recover a website's posts from the Wayback Machine.
  *
- *   import { restore } from "@amrelshabrawydev/wayback-restore";
+ *   import { restore } from "@amrelshabrawy/wayback-restore";
  *   const { posts, report } = await restore({ domain: "example.com", formats: ["json", "supabase"] });
  */
 import crypto from "node:crypto";

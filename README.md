@@ -8,13 +8,13 @@
 
 Bring a lost website back from the Internet Archive — **WordPress, Next.js, React or plain HTML/CSS/JS** — posts, pages and images, with the original URLs, SEO data and Arabic/RTL slugs intact — and import it into **Supabase, Prisma, PostgreSQL, MySQL, SQLite, MongoDB, Markdown, CSV or WordPress**.
 
-[![npm](https://img.shields.io/npm/v/@amrelshabrawydev/wayback-restore?color=89b4fa&label=npm)](https://www.npmjs.com/package/@amrelshabrawydev/wayback-restore)
+[![npm](https://img.shields.io/npm/v/@amrelshabrawy/wayback-restore?color=89b4fa&label=npm)](https://www.npmjs.com/package/@amrelshabrawy/wayback-restore)
 [![Node](https://img.shields.io/badge/node-%E2%89%A520.18-94e2d5)](package.json)
 [![License: MIT](https://img.shields.io/badge/license-MIT-cba6f7)](LICENSE)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-a6e3a1)](CONTRIBUTING.md)
 
 ```bash
-npx @amrelshabrawydev/wayback-restore
+npx @amrelshabrawy/wayback-restore
 ```
 
 <img src="docs/banner.gif" alt="wayback-restore — animated logo in the terminal" width="760" />
@@ -108,8 +108,8 @@ That client's articles came back at their original addresses, on a new Next.js s
 | 🛒 | Shopify · Salla · Zid · WooCommerce | Soon | Products and collections — v0.5 |
 
 ```bash
-npx @amrelshabrawydev/wayback-restore my-next-site.com --platform nextjs --format md
-npx @amrelshabrawydev/wayback-restore old-portfolio.com --platform static
+npx @amrelshabrawy/wayback-restore my-next-site.com --platform nextjs --format md
+npx @amrelshabrawy/wayback-restore old-portfolio.com --platform static
 ```
 
 In interactive mode it's the second question — pick one, or **Not sure** to let the tool decide:
@@ -142,7 +142,7 @@ Requires **Node.js 20.18+**.
 **Interactive** (recommended):
 
 ```bash
-npx @amrelshabrawydev/wayback-restore
+npx @amrelshabrawy/wayback-restore
 ```
 
 It asks for the domain, what the site was built with, where you'll import the content, which version of the site to use, which pages, and whether to download images — then offers a **quick 5-page test** before the full run, and prints the one-line command to repeat it.
@@ -153,19 +153,19 @@ It asks for the domain, what the site was built with, where you'll import the co
 
 ```bash
 # see what would be restored — only queries the archive index
-npx @amrelshabrawydev/wayback-restore example.com --dry-run
+npx @amrelshabrawy/wayback-restore example.com --dry-run
 
 # try 5 pages first
-npx @amrelshabrawydev/wayback-restore example.com --limit 5
+npx @amrelshabrawy/wayback-restore example.com --limit 5
 
 # restore everything for Supabase + Markdown
-npx @amrelshabrawydev/wayback-restore example.com --format supabase,md
+npx @amrelshabrawy/wayback-restore example.com --format supabase,md
 ```
 
 Or install it once and use the short command:
 
 ```bash
-npm i -g @amrelshabrawydev/wayback-restore
+npm i -g @amrelshabrawy/wayback-restore
 wayback-restore example.com
 ```
 
@@ -233,7 +233,7 @@ Every database export uses the same columns:
 ## 🧩 Use it from code
 
 ```js
-import { restore } from "@amrelshabrawydev/wayback-restore";
+import { restore } from "@amrelshabrawy/wayback-restore";
 
 const { posts, report } = await restore({
   domain: "example.com",

@@ -1,5 +1,5 @@
 /**
- * Interactive mode: `npx @amrelshabrawydev/wayback-restore` with no arguments
+ * Interactive mode: `npx @amrelshabrawy/wayback-restore` with no arguments
  * asks a few questions (like create-next-app) instead of needing long commands.
  */
 import * as p from "@clack/prompts";
@@ -51,7 +51,7 @@ export function toCommand(o) {
   if (o.include) args.push("--include", `"${o.include.source}"`);
   if (!o.images) args.push("--no-images");
   if (o.limit && Number.isFinite(o.limit)) args.push("--limit", String(o.limit));
-  return `npx @amrelshabrawydev/wayback-restore ${args.join(" ")}`;
+  return `npx @amrelshabrawy/wayback-restore ${args.join(" ")}`;
 }
 
 /** Platform list for the "built with" question: ready ones first, then a dimmed "coming soon" group */

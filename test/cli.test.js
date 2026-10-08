@@ -26,10 +26,10 @@ test("validateDate and validateTable", () => {
 
 test("toCommand rebuilds the equivalent one-line command", () => {
   const cmd = toCommand({ domain: "example.com", outDir: "restored", formats: ["json", "supabase"], table: "articles", to: "2024-06", include: /^\/blog\//i, images: false, limit: Infinity });
-  assert.equal(cmd, 'npx @amrelshabrawydev/wayback-restore example.com --format json,supabase --table articles --to 2024-06 --include "^\\/blog\\/" --no-images');
-  assert.equal(toCommand({ domain: "a.com", outDir: "restored", formats: ["json"], images: true }), "npx @amrelshabrawydev/wayback-restore a.com");
-  assert.equal(toCommand({ domain: "a.com", platform: "nextjs", outDir: "restored", formats: ["md"], images: true }), "npx @amrelshabrawydev/wayback-restore a.com --platform nextjs --format md");
-  assert.equal(toCommand({ domain: "a.com", platform: "auto", outDir: "restored", formats: ["json"], images: true }), "npx @amrelshabrawydev/wayback-restore a.com");
+  assert.equal(cmd, 'npx @amrelshabrawy/wayback-restore example.com --format json,supabase --table articles --to 2024-06 --include "^\\/blog\\/" --no-images');
+  assert.equal(toCommand({ domain: "a.com", outDir: "restored", formats: ["json"], images: true }), "npx @amrelshabrawy/wayback-restore a.com");
+  assert.equal(toCommand({ domain: "a.com", platform: "nextjs", outDir: "restored", formats: ["md"], images: true }), "npx @amrelshabrawy/wayback-restore a.com --platform nextjs --format md");
+  assert.equal(toCommand({ domain: "a.com", platform: "auto", outDir: "restored", formats: ["json"], images: true }), "npx @amrelshabrawy/wayback-restore a.com");
 });
 
 test("platformOptions: ready platforms selectable, coming-soon ones shown but disabled", () => {

@@ -10,8 +10,8 @@ const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url
 
 const HELP = `
 Usage
-  npx @amrelshabrawydev/wayback-restore              interactive mode (asks a few questions)
-  npx @amrelshabrawydev/wayback-restore <domain> [options]
+  npx @amrelshabrawy/wayback-restore              interactive mode (asks a few questions)
+  npx @amrelshabrawy/wayback-restore <domain> [options]
 
 Examples
   wayback-restore example.com --dry-run
