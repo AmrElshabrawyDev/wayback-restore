@@ -227,6 +227,8 @@ Every database export uses the same columns:
 | `--keep-missing-images` | — | Keep `<img>` tags whose image couldn't be downloaded |
 | `--delay <ms>` | `1500` | Pause between archive requests |
 | `--dry-run` | — | Only list the pages that would be restored |
+| `--scan-limit <n>` | `20000` | Stop listing after *n* archived pages — bigger than any blog or business site (`0` = no limit) |
+| `--force` | — | Allow large platforms such as youtube.com (refused by default) |
 | `-i, --interactive` | — | Ask questions (the default when no domain is given) |
 | `-q, --quiet` | — | Less output |
 
@@ -285,6 +287,7 @@ flowchart LR
 - **Each page and image comes from its own copy.** The archive saves every URL separately, on different days — one page may be from 2022 and another from 2024. `report.json` → `pages[].archiveUrl` opens the exact copy that was used. Images use the copy closest to their page's date, from any year.
 - **Was the site wiped, hacked or taken over?** The *latest* copy may be the broken or new site. The tool skips WordPress placeholder pages (*Sample Page*, *Hello world!*) and warns when the restored pages carry **different site names** — then run again with `--to <a date before it happened>`.
 - **Checking the archive yourself?** On web.archive.org use `*` instead of a year (`/web/*/example.com/wp-content/uploads/*`) — a year in the URL only shows that year's captures.
+- **It's built for websites, not platforms.** Domains like youtube.com or facebook.com are refused straight away, and listing stops at 20,000 archived pages (`--scan-limit`) so a huge site never runs for hours. If the platform you chose doesn't match the pages it finds, it says so and switches to automatic detection.
 - **Only restore content you own** (or have permission to restore).
 - **Be gentle with the Internet Archive** — it's a free, non-profit service. Keep the default delay and test with `--limit` / `--dry-run` first. If it saved your site, [consider donating](https://archive.org/donate). 💙
 - The tool only reads public snapshots: no logins, no API keys.

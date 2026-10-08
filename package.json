@@ -1,6 +1,6 @@
 {
   "name": "@amrelshabrawy/wayback-restore",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Recover a lost website's content and images from the Internet Archive (Wayback Machine) — original URLs, SEO data and Arabic/RTL slugs intact — and export it for Supabase, Prisma, SQL, MongoDB, Markdown or WordPress.",
   "type": "module",
   "bin": {

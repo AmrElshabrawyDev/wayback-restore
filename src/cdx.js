@@ -13,10 +13,12 @@ const PAGE_SIZE = 5000;
 export const toTimestamp = (value) => (value ? String(value).replace(/\D/g, "").slice(0, 14) : undefined);
 
 /**
+ * @param {object} options from/to dates, maxPages (stop listing after this many unique pages, 0 = no limit),
+ *   onProgress({ batches, pages }) after each batch
  * @returns {Promise<Array<{ original: string, timestamp: string, key: string }>>}
  *   newest snapshot per page, sorted by path
  */
-export async function listSnapshots(domain, { from, to, fetchImpl, log } = {}) {
+export async function listSnapshots(domain, { from, to, fetchImpl, log, maxPages = 0, onProgress } = {}) {
   const newest = new Map();
   let resumeKey;
   let pages = 0;
@@ -56,8 +58,12 @@ export async function listSnapshots(domain, { from, to, fetchImpl, log } = {}) {
 
     pages++;
     log?.(`  CDX page ${pages}: ${newest.size} unique pages so far`);
+    onProgress?.({ batches: pages, pages: newest.size });
+    // a site bigger than this isn't a blog or a business site — stop instead of listing forever
+    if (maxPages > 0 && newest.size >= maxPages) break;
     if (resumeKey) await sleep(1000);
   } while (resumeKey);
 
-  return [...newest.values()].sort((a, b) => a.key.localeCompare(b.key));
+  const list = [...newest.values()].sort((a, b) => a.key.localeCompare(b.key));
+  return maxPages > 0 ? list.slice(0, maxPages) : list;
 }

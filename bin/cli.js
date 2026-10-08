@@ -40,6 +40,8 @@ ${EXPORTERS.map((e) => `                             ${e.id.padEnd(10)} ${e.hint
       --keep-missing-images  Keep <img> tags whose image couldn't be downloaded
       --delay <ms>         Pause between archive requests (default: 1500)
       --dry-run            Only list the pages that would be restored
+      --scan-limit <n>     Stop listing after n archived pages (default: 20000, 0 = no limit)
+      --force              Allow large platforms such as youtube.com (not recommended)
   -i, --interactive        Ask questions instead of reading options
   -q, --quiet              Less output
   -v, --version            Show version
@@ -83,6 +85,8 @@ try {
       "keep-missing-images": { type: "boolean" },
       delay: { type: "string" },
       "dry-run": { type: "boolean" },
+      "scan-limit": { type: "string" },
+      force: { type: "boolean" },
       interactive: { type: "boolean", short: "i" },
       quiet: { type: "boolean", short: "q" },
       version: { type: "boolean", short: "v" },
@@ -148,6 +152,8 @@ const options = {
   keepMissingImages: values["keep-missing-images"],
   delay: number(values.delay, "delay"),
   dryRun: values["dry-run"],
+  scanLimit: number(values["scan-limit"], "scan-limit"),
+  force: values.force,
   log: values.quiet ? undefined : (line) => console.log(line),
 };
 // let restore() apply its defaults for anything not passed

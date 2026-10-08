@@ -188,3 +188,64 @@ test("WordPress placeholder pages are skipped and mixed site versions are report
   ]);
   assert.ok(lines.some((l) => /--to <date before it happened>/.test(l)));
 });
+
+test("large platforms are refused straight away, before asking the archive", async () => {
+  let asked = false;
+  const fetchImpl = async () => { asked = true; throw new Error("should not be called"); };
+  for (const domain of ["youtube.com", "https://m.youtube.com/", "facebook.com", "wordpress.com"]) {
+    await assert.rejects(restore({ domain, fetchImpl, outDir: path.join(tmpdir(), "wwr-never") }), /large platform/);
+  }
+  assert.ok(!asked);
+  // sites hosted on a platform are fine
+  const { largePlatform } = await import("../src/checks.js");
+  assert.equal(largePlatform("myblog.wordpress.com"), undefined);
+  assert.equal(largePlatform("naklafeshkw.com"), undefined);
+});
+
+test("listing stops at the scan limit and warns, with progress along the way", async (t) => {
+  const outDir = await mkdtemp(path.join(tmpdir(), "wwr-big-"));
+  t.after(() => rm(outDir, { recursive: true, force: true }));
+  let batches = 0;
+  const fetchImpl = async (url) => {
+    if (!url.includes("/cdx/")) throw new Error(`unexpected ${url}`);
+    batches++;
+    // an endless site: every batch has 3 new pages and a resume key
+    const rows = [["original", "timestamp", "statuscode", "mimetype"]];
+    for (let i = 0; i < 3; i++) rows.push([`https://huge.example/p${batches}-${i}/`, "20240101000000", "200", "text/html"]);
+    rows.push([], [`key${batches}`]);
+    return new Response(JSON.stringify(rows), { headers: { "content-type": "application/json" } });
+  };
+  const progress = [];
+  const warnings = [];
+  const { report } = await restore({
+    domain: "huge.example", outDir, delay: 0, dryRun: true, scanLimit: 7, fetchImpl,
+    onListProgress: (p) => progress.push(p.pages), onWarning: (w) => warnings.push(w),
+  });
+  assert.equal(batches, 3, "stopped once 7 pages were listed");
+  assert.deepEqual(progress, [3, 6, 9]);
+  assert.equal(report.archivedPages, 7);
+  assert.ok(report.truncated);
+  assert.equal(warnings[0].type, "too-big");
+});
+
+test("a wrong platform choice is noticed and switched to automatic detection", async (t) => {
+  const outDir = await mkdtemp(path.join(tmpdir(), "wwr-mismatch-"));
+  t.after(() => rm(outDir, { recursive: true, force: true }));
+  const page = (i) => `<html><head><title>Page ${i}</title></head><body><main><h1>Page ${i}</h1><p>${"word ".repeat(80)}</p></main></body></html>`;
+  const slugs = Array.from({ length: 7 }, (_, i) => `page-${i}`);
+  const fetchImpl = async (url) => {
+    if (url.includes("/cdx/")) {
+      const rows = [["original", "timestamp", "statuscode", "mimetype"], ...slugs.map((s) => [`https://plain.example/${s}.html`, "20240101000000", "200", "text/html"])];
+      return new Response(JSON.stringify(rows), { headers: { "content-type": "application/json" } });
+    }
+    const i = url.match(/page-(\d)/)[1];
+    return new Response(page(i), { headers: { "content-type": "text/html" } });
+  };
+  const warnings = [];
+  const { report } = await restore({ domain: "plain.example", outDir, delay: 0, images: false, platform: "wordpress", fetchImpl, onWarning: (w) => warnings.push(w) });
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0].type, "platform-mismatch");
+  assert.deepEqual(warnings[0].detected, ["static"]);
+  assert.equal(report.warnings[0].type, "platform-mismatch");
+  assert.equal(report.restored, 7, "pages are still restored with auto-detection");
+});

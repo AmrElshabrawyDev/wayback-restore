@@ -8,6 +8,8 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { listSnapshots } from "./cdx.js";
+import { largePlatform, largePlatformMessage } from "./checks.js";
+import { detectPlatform } from "./platforms.js";
 import { exportPosts } from "./exporters.js";
 import { extractPost } from "./extract.js";
 import { fetchWithRetry, sleep } from "./http.js";
@@ -16,6 +18,7 @@ import { writeReport } from "./output.js";
 import { archiveDate, isContentUrl, normalizeDomain, snapshotRange, snapshotUrl } from "./urls.js";
 
 export { listSnapshots } from "./cdx.js";
+export { largePlatform } from "./checks.js";
 export { EXPORTERS, EXPORTER_IDS, exportPosts, toCsv, toMongoNdjson, toRecord, toSql, toWxr } from "./exporters.js";
 export { extractPost, originalImageUrl } from "./extract.js";
 export { PLATFORMS, PLATFORM_IDS, detectPlatform, isSpaShell } from "./platforms.js";
@@ -29,6 +32,9 @@ const DEFAULTS = {
   formats: ["json"],
   platform: "auto",
   table: "posts",
+  // stop listing after this many archived pages (0 = no limit) — bigger than any blog or business site
+  scanLimit: 20000,
+  force: false,
   images: true,
   imageBase: "",
   imageSources: ["archive", "live"],
@@ -88,10 +94,13 @@ export async function restore(options) {
   const opts = { ...DEFAULTS, ...options };
   const domain = normalizeDomain(opts.domain);
   if (!domain || !domain.includes(".")) throw new Error(`Invalid domain: "${opts.domain}"`);
+  const platformName = largePlatform(domain);
+  if (platformName && !opts.force) throw new Error(largePlatformMessage(domain, platformName));
   const { fetchImpl } = opts;
   const log = opts.log ?? (() => {});
   const onProgress = opts.onProgress ?? (() => {});
   const onStart = opts.onStart ?? (() => {});
+  const onWarning = opts.onWarning ?? (() => {});
   // the Prisma import script reads posts.json
   const formats = opts.formats.includes("prisma") && !opts.formats.includes("json") ? ["json", ...opts.formats] : opts.formats;
 
@@ -101,7 +110,30 @@ export async function restore(options) {
   await fs.mkdir(cacheDir, { recursive: true });
 
   log(`Listing archived pages of ${domain}…`);
-  const snapshots = await listSnapshots(domain, { from: opts.from, to: opts.to, fetchImpl, log });
+  const snapshots = await listSnapshots(domain, {
+    from: opts.from,
+    to: opts.to,
+    fetchImpl,
+    log,
+    maxPages: opts.scanLimit,
+    onProgress: opts.onListProgress,
+  });
+  const truncated = opts.scanLimit > 0 && snapshots.length >= opts.scanLimit;
+  const warnings = [];
+  const warn = (warning) => {
+    warnings.push(warning);
+    log(`Warning: ${warning.message}`);
+    onWarning(warning);
+  };
+  if (truncated) {
+    const warning = {
+      type: "too-big",
+      message:
+        `This site has more than ${opts.scanLimit.toLocaleString("en")} archived pages — far bigger than a typical blog or business site. ` +
+        `Only the first ${opts.scanLimit.toLocaleString("en")} are used. Focus on a section with --include "^/blog/", or lift the cap with --scan-limit 0.`,
+    };
+    warn(warning);
+  }
   const candidates = snapshots.filter((s) => isContentUrl(s.original, opts));
   log(`Found ${snapshots.length} archived pages, ${candidates.length} look like posts/pages.`);
   // which copies of the site we're working from
@@ -119,6 +151,8 @@ export async function restore(options) {
     startedAt: new Date().toISOString(),
     archivedPages: snapshots.length,
     candidates: candidates.length,
+    truncated,
+    warnings,
     version,
     restored: 0,
     // every restored page with the exact archived copy it came from (open archiveUrl to compare)
@@ -143,13 +177,31 @@ export async function restore(options) {
     return { posts, report, candidates };
   }
 
+  // the platform the user picked, checked against the first pages; switches to auto-detection if it's clearly wrong
+  let platform = opts.platform;
+  const PLATFORM_CHECK = 5;
+  const seen = [];
+
   for (const [index, snapshot] of candidates.entries()) {
     if (report.restored >= opts.limit) break;
     const archivedAt = archiveDate(snapshot.timestamp);
     const progress = `[${index + 1}/${candidates.length}] ${archivedAt}`;
     try {
       const { html, cached } = await fetchSnapshot(snapshot, { cacheDir, fetchImpl, log, delay: opts.delay });
-      let post = extractPost(html, { ...snapshot, domain, platform: opts.platform });
+      if (platform !== "auto" && seen.length < PLATFORM_CHECK) {
+        seen.push(detectPlatform(html));
+        if (seen.length === PLATFORM_CHECK && !seen.includes(platform)) {
+          const detected = [...new Set(seen)].join(", ");
+          warn({
+            type: "platform-mismatch",
+            chosen: platform,
+            detected: [...new Set(seen)],
+            message: `You chose ${platform}, but the first ${PLATFORM_CHECK} pages don't look like it (they look like: ${detected}). Switched to automatic detection for the rest.`,
+          });
+          platform = "auto";
+        }
+      }
+      let post = extractPost(html, { ...snapshot, domain, platform });
       report.platforms[post.platform] = (report.platforms[post.platform] ?? 0) + 1;
 
       // a WordPress homepage is just a list of posts; on other sites it's a real page

@@ -8,6 +8,7 @@ import { EXPORTERS } from "../exporters.js";
 import { PLATFORMS } from "../platforms.js";
 import { restore } from "../index.js";
 import { normalizeDomain } from "../urls.js";
+import { largePlatform } from "../checks.js";
 
 /** "2024-05-23" → "23 May 2024" */
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -31,6 +32,7 @@ export const validateDomain = (value) => {
   if (!domain) return "Enter the website's domain, e.g. example.com";
   // letters in any script (Arabic domains too), digits, dots and hyphens, with a TLD
   if (!/^[\p{L}\p{N}-]+(\.[\p{L}\p{N}-]+)*\.\p{L}{2,}$/u.test(domain)) return `"${value}" doesn't look like a domain`;
+  if (largePlatform(domain)) return "That's a large platform, not a site you can restore — try your own, e.g. example.com";
   return undefined;
 };
 
@@ -203,17 +205,42 @@ export async function runWizard({ version }) {
   };
 
   // --- run ---
-  const spin = p.spinner();
+  // the timer shows it's alive even when the archive is slow to answer
+  const spin = p.spinner({ indicator: "timer" });
   let spinning = true;
-  spin.start(`Asking the Internet Archive about ${domain}…`);
+  const asking = `Asking the Internet Archive about ${domain}`;
+  spin.start(asking);
   let bar;
   let restored = 0;
+  const warnings = [];
+  const showWarnings = () => {
+    for (const w of warnings.splice(0)) p.log.warn(w.message);
+  };
   try {
     const result = await restore({
       ...options,
+      log: (line) => {
+        // the archive is slow or busy: say so instead of looking frozen
+        const retry = spinning && line.match(/^\s*retry (\d+)\/(\d+)/);
+        if (retry) spin.message(`${asking} — it's slow to answer, retrying (${retry[1]}/${retry[2]})`);
+      },
+      onListProgress: ({ pages }) => spin.message(`${asking} — ${pages.toLocaleString("en")} pages found so far`),
+      onWarning: (warning) => {
+        warnings.push(warning);
+        if (!bar) return;
+        // shown in full when the run ends; a short note now so the user knows
+        bar.message(pc.yellow("⚠ switched to automatic platform detection"));
+      },
       onStart: ({ archivedPages, candidates, version }) => {
         spinning = false;
-        spin.stop(`Found ${archivedPages} archived pages, ${pc.bold(candidates)} look like posts/pages`);
+        spin.stop(`Found ${archivedPages.toLocaleString("en")} archived pages, ${pc.bold(candidates.toLocaleString("en"))} look like posts/pages`);
+        showWarnings();
+        if (archivedPages === 0) {
+          p.log.warn(
+            `The Internet Archive has no saved pages for ${domain}${options.to ? ` before ${options.to}` : ""}.\n` +
+              "Check the spelling, or look it up at https://web.archive.org first.",
+          );
+        }
         if (version.from) {
           p.log.info(
             `${pc.bold("Version:")} the ${version.mode}\n` +
@@ -237,6 +264,7 @@ export async function runWizard({ version }) {
       },
     });
     bar?.stop(`Restored ${restored} pages`);
+    showWarnings();
 
     const { report } = result;
     if (options.dryRun) {
