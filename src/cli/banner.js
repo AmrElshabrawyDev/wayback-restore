@@ -168,55 +168,38 @@ export const canAnimate = (stream = process.stdout, env = process.env) =>
   Boolean(stream.isTTY) && hasColor(stream) && (hasTrueColor(stream) || has256(stream)) && !env.CI && !env.WAYBACK_NO_ANIMATION;
 
 /**
- * Print the banner, animated when the terminal allows it (~0.9 s, any key skips).
+ * Print the banner, animated when the terminal allows it (~0.9 s).
+ *
+ * It never touches stdin: switching the keyboard into raw mode and back before
+ * the questions start broke arrow keys in the prompts on Windows.
  * @returns {Promise<void>}
  */
-export async function playBanner({ version, stream = process.stdout, input = process.stdin, duration = 900, frames = 24 } = {}) {
+export async function playBanner({ version, stream = process.stdout, duration = 900, frames = 24 } = {}) {
   if (!canAnimate(stream)) {
     stream.write(banner({ version, stream }));
     return;
   }
 
-  let skipped = false;
-  const rawInput = Boolean(input?.isTTY) && typeof input.setRawMode === "function";
-  const cleanup = () => {
-    if (rawInput) {
-      input.off("data", onKey);
-      input.setRawMode(false);
-      input.pause();
-    }
-    stream.write("\x1b[?25h"); // show the cursor again
+  const showCursor = () => stream.write("\x1b[?25h");
+  // Ctrl+C during the animation: bring the cursor back before quitting
+  const onInterrupt = () => {
+    showCursor();
+    stream.write("\n");
+    process.exit(130);
   };
-  function onKey(key) {
-    skipped = true;
-    // Ctrl+C still quits
-    if (key?.[0] === 3) {
-      cleanup();
-      stream.write("\n");
-      process.exit(130);
-    }
-  }
-
-  if (rawInput) {
-    input.setRawMode(true);
-    input.resume();
-    input.on("data", onKey);
-  }
+  process.once("SIGINT", onInterrupt);
   stream.write("\x1b[?25l"); // hide the cursor while drawing
   try {
     let height = 0;
-    const draw = (t) => {
-      const lines = bannerLines({ version, stream, t });
+    for (let i = 0; i <= frames; i++) {
+      const lines = bannerLines({ version, stream, t: i / frames });
       if (height) stream.write(`\x1b[${height}A`);
       stream.write(`${lines.map((line) => `\r\x1b[2K${line}`).join("\n")}\n`);
       height = lines.length;
-    };
-    for (let i = 0; i <= frames && !skipped; i++) {
-      draw(i / frames);
       await sleep(duration / frames);
     }
-    if (skipped) draw(1);
   } finally {
-    cleanup();
+    process.off("SIGINT", onInterrupt);
+    showCursor();
   }
 }

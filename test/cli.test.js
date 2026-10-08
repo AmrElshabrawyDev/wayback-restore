@@ -4,7 +4,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { banner, canAnimate, logoLines, playBanner } from "../src/cli/banner.js";
-import { fitLine, humanDate, platformOptions, toCommand, validateDate, validateDomain, validateTable } from "../src/cli/wizard.js";
+import { comingSoon, fitLine, humanDate, platformOptions, toCommand, validateDate, validateDomain, validateTable } from "../src/cli/wizard.js";
 
 const run = promisify(execFile);
 const CLI = fileURLToPath(new URL("../bin/cli.js", import.meta.url));
@@ -32,13 +32,11 @@ test("toCommand rebuilds the equivalent one-line command", () => {
   assert.equal(toCommand({ domain: "a.com", platform: "auto", outDir: "restored", formats: ["json"], images: true }), "npx @amrelshabrawy/wayback-restore a.com");
 });
 
-test("platformOptions: ready platforms selectable, coming-soon ones shown but disabled", () => {
+test("platformOptions: only platforms that work today; the rest in one 'coming soon' line", () => {
   const options = platformOptions();
-  const enabled = options.filter((o) => !o.disabled).map((o) => o.value);
-  assert.deepEqual(enabled, ["wordpress", "nextjs", "static", "react", "auto"]);
-  const soonIndex = options.findIndex((o) => o.value === "__soon");
-  assert.ok(soonIndex > enabled.length - 1);
-  assert.ok(options.slice(soonIndex).every((o) => o.disabled));
+  assert.deepEqual(options.map((o) => o.value), ["wordpress", "nextjs", "static", "react", "auto"]);
+  assert.ok(options.every((o) => !o.disabled), "no greyed-out rows that look empty");
+  assert.match(comingSoon(), /^Coming soon: Blogger, Ghost/);
 });
 
 test("banner shows the logo and name without colour codes when NO_COLOR is set", () => {
@@ -100,15 +98,21 @@ test("logo animation: empty at the start, the full logo at the end", () => {
 test("playBanner prints the static banner when it can't animate", async () => {
   let out = "";
   const stream = { isTTY: false, hasColors: () => false, columns: 100, write: (s) => (out += s) };
-  await playBanner({ version: "1.0.0", stream, input: null });
+  await playBanner({ version: "1.0.0", stream });
   assert.equal(out, banner({ version: "1.0.0", stream }));
   assert.ok(!canAnimate({ isTTY: true, hasColors: () => true }, { CI: "true" }), "never animates in CI");
+});
+
+test("playBanner never touches the keyboard (raw mode broke arrow keys on Windows)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const source = readFileSync(new URL("../src/cli/banner.js", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /setRawMode\(|process\.stdin/);
 });
 
 test("playBanner animates in a terminal and ends on the full banner", async () => {
   let out = "";
   const stream = { isTTY: true, hasColors: () => true, columns: 100, write: (s) => (out += s) };
-  await playBanner({ version: "1.0.0", stream, input: null, duration: 10, frames: 5 });
+  await playBanner({ version: "1.0.0", stream, duration: 10, frames: 5 });
   assert.match(out, /^\x1b\[\?25l/, "hides the cursor");
   assert.match(out, /\x1b\[\?25h$/, "and shows it again");
   assert.equal((out.match(/\x1b\[11A/g) || []).length, 5, "redraws in place");

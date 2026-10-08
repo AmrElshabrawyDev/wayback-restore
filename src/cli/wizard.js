@@ -56,21 +56,18 @@ export function toCommand(o) {
   return `npx @amrelshabrawy/wayback-restore ${args.join(" ")}`;
 }
 
-/** Platform list for the "built with" question: ready ones first, then a dimmed "coming soon" group */
+/** Platform choices for the "built with" question — only the ones that work today */
 export function platformOptions() {
   const tag = (status) => (status === "beta" ? ` ${pc.yellow("beta")}` : "");
-  const ready = PLATFORMS.filter((x) => x.status !== "soon").map((x) => ({
+  return PLATFORMS.filter((x) => x.status !== "soon").map((x) => ({
     value: x.id,
     label: `${x.label}${tag(x.status)}`,
     hint: x.hint,
   }));
-  const soon = PLATFORMS.filter((x) => x.status === "soon").map((x) => ({
-    value: x.id,
-    label: pc.dim(x.label),
-    disabled: true,
-  }));
-  return [...ready, { value: "__soon", label: pc.dim("── coming soon ──"), disabled: true }, ...soon];
 }
+
+/** One readable line about what's coming, instead of greyed-out choices that look like empty rows */
+export const comingSoon = () => `Coming soon: ${PLATFORMS.filter((x) => x.status === "soon").map((x) => x.label.split(" · ")[0]).join(", ")}…`;
 
 /**
  * Shorten text to fit one terminal line. A progress line that wraps can't be
@@ -114,9 +111,8 @@ export async function runWizard({ version }) {
 
   const platform = answer(
     await p.select({
-      message: "What was the site built with?",
+      message: `What was the site built with? ${pc.dim(`(${comingSoon()})`)}`,
       options: platformOptions(),
-      maxItems: 12,
     }),
   );
   if (platform === "react") {
